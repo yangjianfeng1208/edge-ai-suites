@@ -63,15 +63,9 @@ async def ingest_raw_text(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """
-    直接解析纯文本入库
-    Payload: {"text": "...", "file_path": "...", "bucket_name": "...", "meta": {}}
-    """
     text = payload.get("text")
     if not text:
         raise HTTPException(status_code=400, detail="Text content is required")
-
-    payload["is_raw_text"] = True 
 
     result = await task_service.handle_text_ingest(
         db,

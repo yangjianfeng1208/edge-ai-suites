@@ -3,27 +3,13 @@
 
 import pathlib
 import shutil
-import yaml
+import os
 from io import BytesIO
-from datetime import datetime, timezone
-from types import SimpleNamespace
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from minio import Minio
 from minio.error import S3Error
 
-_SMART_CLASSROOM_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent
-DEFAULT_CONF_PATH = str(_SMART_CLASSROOM_DIR / "config.yaml")
-
-def _load_minimal_config(path: str):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        def to_ns(d):
-            return SimpleNamespace(**{k: to_ns(v) if isinstance(v, dict) else v for k, v in d.items()})
-        return to_ns(data)
-    except FileNotFoundError:
-        raise RuntimeError(f"Config no found: {pathlib.Path(path).resolve()}")
 
 class MinioStore:
     """Standard, service-friendly MinIO interface."""
@@ -33,31 +19,15 @@ class MinioStore:
         self._bucket = bucket_name
 
     @classmethod
-    def from_config(cls, config_path: str = None) -> "MinioStore":
-        final_path = config_path if config_path is not None else DEFAULT_CONF_PATH
+    def from_config(cls) -> "MinioStore":
+        server     = os.getenv("MINIO_SERVER", "127.0.0.1:9000")
+        access_key = os.getenv("MINIO_ROOT_USER", "minioadmin")
+        secret_key = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+        bucket     = os.getenv("MINIO_BUCKET", "content-search")
+        secure     = os.getenv("MINIO_SECURE", "False").lower() in ("true", "1", "t")
 
-        cfg_root = _load_minimal_config(final_path)
-        cfg = cfg_root.content_search.minio
-
-        server = cfg.server
-        access_key = cfg.root_user
-        secret_key = cfg.root_password
-        secure = bool(getattr(cfg, "secure", False))
-        bucket = cfg.bucket
-
-        if not server:
-            raise RuntimeError("Missing content_search.minio.server in config.yaml")
-        if not access_key or not secret_key:
-            raise RuntimeError("Missing content_search.minio.root_user/root_password in config.yaml")
-        if not bucket:
-            raise RuntimeError("Missing content_search.minio.bucket in config.yaml")
-        client = Minio(
-            str(cfg.server),
-            access_key=str(access_key),
-            secret_key=str(secret_key),
-            secure=secure
-        )
-        return cls(client, str(cfg.bucket))
+        client = Minio(server, access_key=access_key, secret_key=secret_key, secure=secure)
+        return cls(client, bucket)
 
     @property
     def client(self) -> Minio:
