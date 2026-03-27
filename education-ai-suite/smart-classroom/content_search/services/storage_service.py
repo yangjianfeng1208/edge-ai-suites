@@ -1,6 +1,6 @@
-import uuid
-import logging
+import uuid, sys, logging
 from fastapi import UploadFile
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class StorageService:
 
     def _try_initialize(self):
         try:
-            from providers.content_search_minio.minio_client import MinioStore
+            from providers.minio_wrapper.minio_client import MinioStore
             self._store = MinioStore.from_config()
             self._store.ensure_bucket()
             self._error_msg = None
