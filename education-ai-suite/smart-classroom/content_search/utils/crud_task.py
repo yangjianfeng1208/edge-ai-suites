@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from sqlalchemy.orm import Session
 from typing import Optional, Any, Dict
 from utils.core_models import AITask

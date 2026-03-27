@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Video Preprocess Service (decode/chunk/sample → summarize → MinIO)
 - downloads the video from MinIO to a temp file
 - chunks the video by time (FrameSampler.iter_chunks)

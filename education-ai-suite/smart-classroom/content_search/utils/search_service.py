@@ -1,4 +1,8 @@
-# utils/search_service.py
+#
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import httpx
 import logging
 from utils.config import settings

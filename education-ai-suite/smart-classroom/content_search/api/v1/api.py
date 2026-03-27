@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 # api/v1/api.py
 from fastapi import APIRouter
 from api.v1.endpoints import system, object, task

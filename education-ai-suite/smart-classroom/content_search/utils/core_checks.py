@@ -1,4 +1,8 @@
-# utils/core_checks.py
+#
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import requests
 from sqlalchemy import text
 from utils.database import SessionLocal
