@@ -37,12 +37,9 @@ async def ingest_existing_file(
         raise HTTPException(status_code=400, detail="file_key is required")
     minio_payload = {
         "file_key": file_key,
-        "bucket_name": "your-bucket-name",  # 如果是动态的，可以从 file_key 解析或配置获取
-        # 如果 handle_file_upload 还需要其他字段（如 size, extension），请在此补充
+        "bucket_name": "your-bucket-name",
     }
 
-    # 2. 核心逻辑：调用 task_service，令 should_ingest=True
-    # 这样它就会跳过“存储”步骤（或处理已存储逻辑），直接进入“解析/入库”流程
     result = await task_service.handle_file_upload(
         db, 
         minio_payload, 
