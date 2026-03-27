@@ -1,4 +1,4 @@
-# core/models.py
+# core_models.py
 from sqlalchemy import Column, String, JSON, DateTime, Integer
 from utils.database import Base
 from datetime import datetime

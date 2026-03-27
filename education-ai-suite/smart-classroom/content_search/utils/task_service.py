@@ -61,18 +61,49 @@ class TaskService:
             raise e
 
     @staticmethod
+    async def handle_text_ingest(db: Session, payload: dict, background_tasks: BackgroundTasks):
+        task = task_crud.create_task(
+            db, 
+            task_type="text_ingest", 
+            payload=payload, 
+            status=TaskStatus.PROCESSING
+        )
+        background_tasks.add_task(TaskService.execute_worker_logic, str(task.id))
+        return {"task_id": str(task.id), "status": task.status}
+
+    @staticmethod
     def execute_worker_logic(task_id: str):
         print(f"[BACKGROUND] Starting Ingest for Task {task_id}", flush=True)
         with SessionLocal() as db:
             task = db.query(AITask).filter(AITask.id == task_id).first()
             if not task: return
             try:
-                file_key = task.payload.get('file_key') or task.payload.get('video_key')
-                ai_result = asyncio.run(search_service.trigger_ingest(file_key))
-                task.status = "COMPLETED"
-                task.result = ai_result
+                if task.task_type == "text_ingest":
+                    # 1. raw text Ingest
+                    ai_result = asyncio.run(search_service.ingest_text(
+                        text=task.payload.get("text"),
+                        file_path=task.payload.get("file_path"),
+                        bucket_name=task.payload.get("bucket_name"),
+                        meta=task.payload.get("meta")
+                    ))
+                else:
+                    # 2. file/video Ingest
+                    file_key = task.payload.get('file_key') or task.payload.get('video_key') or task.payload.get('file_path')
+                    bucket_name = task.payload.get('bucket_name')
+                    ai_result = asyncio.run(search_service.trigger_ingest(
+                        file_path=file_key, 
+                        bucket_name=bucket_name
+                    ))
+
+                if ai_result and "error" not in ai_result:
+                    task.status = "COMPLETED"
+                    task.result = ai_result
+                    print(f"[OK] Task {task_id} completed", flush=True)
+                else:
+                    task.status = "FAILED"
+                    task.result = ai_result or {"error": "Unknown error from search service"}
+                    print(f"[FAILED] Task {task_id} failed: {task.result}", flush=True)
                 db.commit()
-                print(f"[OK] Task {task_id} ingest completed", flush=True)
 
             except Exception as e:
                 task.status = "FAILED"

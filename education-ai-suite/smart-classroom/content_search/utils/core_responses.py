@@ -1,5 +1,5 @@
 import time
-from typing import Any, Optional
+from typing import Any
 
 def resp_200(data: Any, message: str = "Success") -> dict:
     return {

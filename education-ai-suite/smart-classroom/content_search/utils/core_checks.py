@@ -1,4 +1,4 @@
-# core/checks.py
+# utils/core_checks.py
 import requests
 from sqlalchemy import text
 from utils.database import SessionLocal

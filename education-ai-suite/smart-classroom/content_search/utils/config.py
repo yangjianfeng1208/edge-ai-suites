@@ -1,4 +1,4 @@
-# config.py
+# utils/config.py
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://postgres:password@localhost:5432/edu_ai"
 
     SEARCH_SERVICE_BASE_URL: str = "http://127.0.0.1:9990"
+
     MINIO_DEFAULT_BUCKET: str = "content-search"
 
     class Config:

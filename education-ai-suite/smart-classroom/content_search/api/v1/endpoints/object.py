@@ -32,20 +32,16 @@ async def ingest_existing_file(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
+    bucket_name = payload.get("bucket_name", "content-search")
     file_key = payload.get("file_key")
     if not file_key:
         raise HTTPException(status_code=400, detail="file_key is required")
+
     minio_payload = {
         "file_key": file_key,
-        "bucket_name": "your-bucket-name",
+        "bucket_name": bucket_name,
     }
-
-    result = await task_service.handle_file_upload(
-        db, 
-        minio_payload, 
-        background_tasks, 
-        should_ingest=True
-    )
+    result = await task_service.handle_file_ingest(db, minio_payload, background_tasks)
 
     return resp_200(
         data={
@@ -54,6 +50,36 @@ async def ingest_existing_file(
             "file_key": file_key
         },
         message="Ingestion process started for existing file"
+    )
+
+@router.post("/ingest-text")
+async def ingest_raw_text(
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    直接解析纯文本入库
+    Payload: {"text": "...", "file_path": "...", "bucket_name": "...", "meta": {}}
+    """
+    text = payload.get("text")
+    if not text:
+        raise HTTPException(status_code=400, detail="Text content is required")
+
+    payload["is_raw_text"] = True 
+
+    result = await task_service.handle_text_ingest(
+        db,
+        payload,
+        background_tasks
+    )
+
+    return resp_200(
+        data={
+            "task_id": str(result["task_id"]),
+            "status": result["status"]
+        },
+        message="Text ingestion started"
     )
 
 @router.post("/upload-ingest")

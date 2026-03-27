@@ -1,4 +1,4 @@
-# services/search_service.py
+# utils/search_service.py
 import httpx
 import logging
 from utils.config import settings
@@ -9,24 +9,54 @@ class SearchService:
     def __init__(self):
         self.base_url = settings.SEARCH_SERVICE_BASE_URL
         self.ingest_url = f"{self.base_url}/v1/dataprep/ingest"
+        self.ingest_text_url = f"{self.base_url}/v1/dataprep/ingest_text"
         self.retrieval_url = f"{self.base_url}/v1/retrieval"
         self.default_bucket = settings.MINIO_DEFAULT_BUCKET
 
-    async def trigger_ingest(self, file_path: str, bucket_name: str = None):
+    async def trigger_ingest(self, file_path: str, bucket_name: str = None, meta: dict = None, is_directory: bool = False):
         target_bucket = bucket_name or self.default_bucket
-        payload = {"bucket_name": target_bucket, "file_path": file_path}
+        path_key = "folder_path" if is_directory else "file_path"
+        payload = {
+            "bucket_name": target_bucket,
+            path_key: file_path,
+            "meta": meta or {}
+        }
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(self.ingest_url, json=payload, timeout=120.0)
+                # Ingest maybe slow
+                response = await client.post(self.ingest_url, json=payload, timeout=300.0)
                 response.raise_for_status()
                 logger.info(f"Successfully triggered ingest for {file_path}")
                 return response.json()
             except Exception as e:
                 logger.error(f"Search service ingest error: {str(e)}")
-                return None
+                return {"error": str(e)}
 
-    async def semantic_search(self, query: str, limit: int = 3):
-        payload = {"query": query, "max_num_results": limit}
+    async def ingest_text(self, text: str, file_path: str = None, bucket_name: str = None, meta: dict = None):
+        payload = {
+            "text": text,
+            "file_path": file_path,
+            "bucket_name": bucket_name or self.default_bucket,
+            "meta": meta or {}
+        }
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.ingest_text_url, json=payload, timeout=60.0)
+                response.raise_for_status()
+                logger.info(f"Successfully ingested raw text for {file_path}")
+                return response.json()
+            except Exception as e:
+                logger.error(f"Search service ingest_text error: {str(e)}")
+                return {"error": str(e)}
+
+    async def semantic_search(self, query: str, limit: int = 3, filters: dict = None):
+        payload = {
+            "query": query, 
+            "max_num_results": limit
+        }
+        if filters:
+            payload["filter"] = filters
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(self.retrieval_url, json=payload)
