@@ -1,7 +1,7 @@
 # services/search_service.py
 import httpx
 import logging
-from config import settings
+from utils.config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
-import uuid, sys, logging
+import uuid
+import logging
 from fastapi import UploadFile
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

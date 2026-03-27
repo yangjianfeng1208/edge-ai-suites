@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from database import get_db
-from services.task_service import task_service
-from services.storage_service import storage_service
-from services.search_service import search_service
+from utils.database import get_db
+from utils.task_service import task_service
+from utils.storage_service import storage_service
+from utils.search_service import search_service
 import urllib.parse
 import mimetypes
-from core.responses import resp_200
+from utils.core_responses import resp_200
 
 router = APIRouter()
 
@@ -26,7 +26,38 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
         message="File received, processing started."
     )
 
-# @router.post("/ingest")
+@router.post("/ingest")
+async def ingest_existing_file(
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    file_key = payload.get("file_key")
+    if not file_key:
+        raise HTTPException(status_code=400, detail="file_key is required")
+    minio_payload = {
+        "file_key": file_key,
+        "bucket_name": "your-bucket-name",  # 如果是动态的，可以从 file_key 解析或配置获取
+        # 如果 handle_file_upload 还需要其他字段（如 size, extension），请在此补充
+    }
+
+    # 2. 核心逻辑：调用 task_service，令 should_ingest=True
+    # 这样它就会跳过“存储”步骤（或处理已存储逻辑），直接进入“解析/入库”流程
+    result = await task_service.handle_file_upload(
+        db, 
+        minio_payload, 
+        background_tasks, 
+        should_ingest=True
+    )
+
+    return resp_200(
+        data={
+            "task_id": str(result["task_id"]),
+            "status": result["status"],
+            "file_key": file_key
+        },
+        message="Ingestion process started for existing file"
+    )
 
 @router.post("/upload-ingest")
 async def upload_file_with_ingest(

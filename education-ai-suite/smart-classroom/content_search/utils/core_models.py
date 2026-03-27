@@ -1,6 +1,6 @@
 # core/models.py
 from sqlalchemy import Column, String, JSON, DateTime, Integer
-from database import Base
+from utils.database import Base
 from datetime import datetime
 import uuid
 

@@ -1,14 +1,14 @@
-# services/task_service.py
+# task_service.py
 
 import traceback
 import asyncio
 from sqlalchemy.orm import Session
 from fastapi import BackgroundTasks
-from database import SessionLocal
-from crud.task_crud import task_crud
-from schemas.task import TaskStatus
-from services.search_service import search_service 
-from core.models import AITask
+from utils.database import SessionLocal
+from utils.crud_task import task_crud
+from utils.schemas_task import TaskStatus
+from utils.search_service import search_service 
+from utils.core_models import AITask
 
 class TaskService:
     @staticmethod
@@ -39,25 +39,45 @@ class TaskService:
             raise e
 
     @staticmethod
+    async def handle_file_ingest(
+        db: Session,
+        file_key: str,
+        background_tasks: BackgroundTasks
+    ):
+        try:
+            task = task_crud.create_task(
+                db, 
+                task_type="file_ingest_only",
+                payload={"file_key": file_key},
+                status=TaskStatus.PROCESSING
+            )
+
+            background_tasks.add_task(TaskService.execute_worker_logic, str(task.id))
+
+            return {"task_id": str(task.id), "status": task.status}
+
+        except Exception as e:
+            traceback.print_exc()
+            raise e
+
+    @staticmethod
     def execute_worker_logic(task_id: str):
         print(f"[BACKGROUND] Starting Ingest for Task {task_id}", flush=True)
         with SessionLocal() as db:
             task = db.query(AITask).filter(AITask.id == task_id).first()
             if not task: return
-
             try:
-
                 file_key = task.payload.get('file_key') or task.payload.get('video_key')
                 ai_result = asyncio.run(search_service.trigger_ingest(file_key))
                 task.status = "COMPLETED"
                 task.result = ai_result
                 db.commit()
-                print(f"✅ Task {task_id} ingest completed", flush=True)
+                print(f"[OK] Task {task_id} ingest completed", flush=True)
 
             except Exception as e:
                 task.status = "FAILED"
                 task.result = {"error": str(e)}
                 db.commit()
-                print(f"❌ Task {task_id} failed: {e}", flush=True)
+                print(f"[FAILED] Task {task_id} failed: {e}", flush=True)
 
 task_service = TaskService()

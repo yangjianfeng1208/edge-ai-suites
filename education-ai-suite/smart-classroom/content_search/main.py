@@ -4,10 +4,10 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from database import engine, get_db, Base
+from utils.database import engine, get_db, Base
 from api.v1.api import api_router
-from core.checks import check_services
-from core.exceptions import setup_exception_handlers
+from utils.core_checks import check_services
+from utils.core_exceptions import setup_exception_handlers
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Edu-AI Orchestrator")
