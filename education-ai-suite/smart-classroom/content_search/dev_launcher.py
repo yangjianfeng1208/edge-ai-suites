@@ -9,7 +9,7 @@ import socket
 
 def load_config_to_env(config_path):
     if not os.path.exists(config_path):
-        print(f"⚠️  Config not found at {config_path}")
+        print(f"Config not found at {config_path}")
         return
 
     try:
@@ -33,6 +33,8 @@ def load_config_to_env(config_path):
         
         # File Ingest
         fi = cs.get('file_ingest', {})
+        os.environ["FILE_INGEST_HOST"] = str(fi.get('host_addr', "127.0.0.1"))
+        os.environ["FILE_INGEST_PORT"] = str(fi.get('port', 9990))
         os.environ["CHROMA_COLLECTION_NAME"] = str(fi.get('collection_name', "content-search"))
         os.environ["INGEST_DEVICE"] = str(fi.get('device', "CPU"))
         os.environ["VISUAL_EMBEDDING_MODEL"] = str(fi.get('visual_embedding_model', "CLIP/clip-vit-b-16"))
@@ -87,56 +89,39 @@ def start_dev_environment():
 
     config_file = os.path.join(cwd, "..", "config.yaml")
     load_config_to_env(config_file)
-
-    # MinIO
-    minio_addr = os.getenv("MINIO_SERVER", "127.0.0.1:9000")
-    minio_console = ":9001"
-
-    # ChromaDB
-    chroma_host = os.getenv("CHROMA_HOST", "localhost")
-    chroma_port = os.getenv("CHROMA_PORT", "9090")
-    
-    # File Ingest
-    fi_host = "127.0.0.1"
-    fi_port = "9990"
-
-    # Video Preprocess
-    vp_host = os.getenv("VIDEO_PREPROCESS_HOST", "127.0.0.1")
-    vp_port = os.getenv("VIDEO_PREPROCESS_PORT", "8001")
-
     print(f"Starting Services with Dynamic Configuration...\n")
-
     try:
         # === STAGE 1: Infrastructure ===
         print("--- STAGE 1: Infrastructure ---")
+        m_srv = os.getenv("MINIO_SERVER").split(':')
         processes.append(launch("MinIO", [
             os.path.abspath(r".\providers\minio_wrapper\minio.exe"), "server", 
             os.path.abspath(r".\providers\minio_wrapper\minio_data"), 
-            "--address", minio_addr, "--console-address", minio_console
+            "--address", os.getenv("MINIO_SERVER"), "--console-address", ":9001"
         ]))
 
         processes.append(launch("ChromaDB", [
             python_exe, "-m", "uvicorn", "chromadb.app:app", 
-            "--host", chroma_host, "--port", chroma_port
+            "--host", os.getenv("CHROMA_HOST"), "--port", os.getenv("CHROMA_PORT")
         ]))
 
-        if not wait_for_service("MinIO", minio_addr.split(':')[0], int(minio_addr.split(':')[1])): return
-        if not wait_for_service("ChromaDB", chroma_host, int(chroma_port)): return
+        wait_for_service("MinIO", m_srv[0], int(m_srv[1]))
+        wait_for_service("ChromaDB", os.getenv("CHROMA_HOST"), int(os.getenv("CHROMA_PORT")))
 
         # === STAGE 2: Core Sub-services ===
         print("\n--- STAGE 2: Core Sub-services ---")
         processes.append(launch("File Ingest Service", [
             python_exe, "-m", "uvicorn", "providers.file_ingest_and_retrieve.server:app", 
-            "--host", fi_host, "--port", fi_port
+            "--host", os.getenv("FILE_INGEST_HOST"), "--port", os.getenv("FILE_INGEST_PORT")
         ]))
 
         processes.append(launch("Video Preprocess Service", [
             python_exe, "-m", "uvicorn", "providers.video_preprocess.server:app", 
-            "--host", vp_host, "--port", vp_port
+            "--host", os.getenv("VIDEO_PREPROCESS_HOST"), "--port", os.getenv("VIDEO_PREPROCESS_PORT")
         ]))
 
-        if not wait_for_service("File Ingest", fi_host, int(fi_port), max_retries=100): return
-        if not wait_for_service("Video Preprocess", vp_host, int(vp_port), max_retries=60): return
+        wait_for_service("File Ingest", os.getenv("FILE_INGEST_HOST"), int(os.getenv("FILE_INGEST_PORT")), 100)
+        wait_for_service("Video Preprocess", os.getenv("VIDEO_PREPROCESS_HOST"), int(os.getenv("VIDEO_PREPROCESS_PORT")), 60)
 
         # === STAGE 3: Main App ===
         print("\n--- STAGE 3: Main App ---")
