@@ -8,7 +8,7 @@ import os
 from moviepy import VideoFileClip
 from PIL import Image
 
-from content_search.providers.file_ingest_and_retrieve.embedding import get_model_handler, EmbeddingModel
+from providers.file_ingest_and_retrieve.embedding import get_model_handler, EmbeddingModel
 from llama_index.embeddings.huggingface_openvino import OpenVINOEmbedding
 
 from providers.chromadb_wrapper.chroma_client import ChromaClientWrapper
