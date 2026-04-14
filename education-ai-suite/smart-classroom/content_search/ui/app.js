@@ -510,6 +510,20 @@ function filterResultsByType(results, filterValue) {
   const labelTagAddBtn = el("label-tag-add-btn");
 
   /**
+   * Auto-resize input based on content
+   */
+  function autoResizeTagInput(input) {
+    const value = input.value || input.placeholder;
+    const length = value.length;
+    // For empty/placeholder: 8ch; for values: fit content with min 2ch
+    if (!input.value) {
+      input.style.width = '8ch';
+    } else {
+      input.style.width = `${Math.max(2, length + 0.5)}ch`;
+    }
+  }
+
+  /**
    * Create a new editable tag
    */
   function createEditableTag(initialValue = "") {
@@ -521,6 +535,9 @@ function filterResultsByType(results, filterValue) {
     input.className = "label-tag-item__input";
     input.placeholder = "Enter label...";
     input.value = initialValue;
+
+    // Initialize input width
+    autoResizeTagInput(input);
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -537,6 +554,11 @@ function filterResultsByType(results, filterValue) {
       tag.remove();
     });
 
+    // Auto-resize on input
+    input.addEventListener("input", () => {
+      autoResizeTagInput(input);
+    });
+
     // When user types, update the set
     input.addEventListener("blur", () => {
       const oldValue = input.dataset.oldValue || "";
@@ -549,6 +571,8 @@ function filterResultsByType(results, filterValue) {
       if (newValue) {
         searchSelectedLabels.add(newValue);
         input.dataset.oldValue = newValue;
+        input.value = newValue;
+        autoResizeTagInput(input);
       } else {
         tag.remove();
       }
@@ -986,6 +1010,9 @@ function filterResultsByType(results, filterValue) {
         // Text search
         results = await performTextSearch(textQuery, safeTopK, filter);
       }
+
+      // Sort results by score in descending order (highest first)
+      results.sort((a, b) => (b.score || 0) - (a.score || 0));
 
       const typeLabel = selectedTypes.length === 3 ? "document, image, video" : selectedTypes.join(", ");
       const includesNoLabel = searchSelectedLabels.has(NO_LABEL_KEY);

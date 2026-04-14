@@ -939,33 +939,56 @@ body {
 .search-toolbar__tags {
   flex: 1;
   min-width: 150px;
+  max-width: 400px;
+  overflow: hidden;
 }
 
 .label-tags-list-compact {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 4px;
   align-items: center;
   padding: 2px 0;
   border: none;
   background: transparent;
   border-radius: 0;
-  min-height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.label-tags-list-compact::-webkit-scrollbar {
+  height: 4px;
+}
+
+.label-tags-list-compact::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.label-tags-list-compact::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.label-tags-list-compact::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .label-tag-add-compact {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 3px;
+  padding: 3px 6px;
   border: 1px dashed #d1d5db;
   background: transparent;
   color: #6b7280;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 3px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
+  flex-shrink: 0;
 }
 
 .label-tag-add-compact:hover {
@@ -976,6 +999,8 @@ body {
 
 .label-tag-add-compact svg {
   flex-shrink: 0;
+  width: 12px;
+  height: 12px;
 }
 
 .checkgroup {
@@ -1317,7 +1342,6 @@ body {
   border: 1px solid #d1d5db;
   white-space: nowrap;
   flex-shrink: 0;
-  margin-left: auto;
   background: #f3f4f6;
   color: #6b7280;
 }
@@ -1363,13 +1387,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, Highlight 50%, var(--border));
-  background: color-mix(in srgb, Highlight 13%, var(--surface));
-  color: var(--fg);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
   font-size: 11px;
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.5;
   user-select: none;
   white-space: nowrap;
@@ -1377,7 +1401,7 @@ body {
 
 .tag--sm {
   font-size: 10px;
-  padding: 2px 4px 2px 8px;
+  padding: 2px 6px;
   gap: 2px;
 }
 
@@ -1445,53 +1469,60 @@ body {
 .label-tag-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: rgba(0, 104, 181, 0.1);
-  border: 1px solid rgba(0, 104, 181, 0.3);
-  border-radius: 4px;
-  font-size: 13px;
+  gap: 3px;
+  padding: 3px 6px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  font-size: 11px;
   font-weight: 500;
-  color: #0068b5;
-  max-width: 200px;
+  color: #374151;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .label-tag-item__input {
   border: none;
   background: transparent;
   padding: 0;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  color: #0068b5;
+  color: #374151;
   outline: none;
-  min-width: 60px;
-  max-width: 150px;
+  min-width: 0;
+  max-width: none;
 }
 
 .label-tag-item__input::placeholder {
-  color: rgba(0, 104, 181, 0.5);
+  color: #9ca3af;
 }
 
 .label-tag-item__remove {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border: none;
   background: transparent;
-  color: #0068b5;
+  color: #6b7280;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 2px;
   padding: 0;
   flex-shrink: 0;
   opacity: 0.7;
   transition: all 0.15s;
 }
 
+.label-tag-item__remove svg {
+  width: 10px;
+  height: 10px;
+}
+
 .label-tag-item__remove:hover {
   opacity: 1;
-  background: rgba(0, 104, 181, 0.15);
+  background: #e5e7eb;
+  color: #374151;
 }
 
 /* ── Label Filter Dropdown (Excel-style) ────────────────────── */
@@ -2460,16 +2491,13 @@ body {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: rgba(0, 104, 181, 0.1);
-  border: 1px solid rgba(0, 104, 181, 0.2);
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 12px;
-  color: #0068b5;
-  max-width: 120px;
+  color: #374151;
   flex-shrink: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .file-item__label-tag input {
@@ -2480,7 +2508,7 @@ body {
   padding: 0;
   margin: 0;
   outline: none;
-  width: 100%;
+  width: auto;
   min-width: 40px;
 }
 
@@ -2493,7 +2521,7 @@ body {
   padding: 0;
   border: none;
   background: transparent;
-  color: #0068b5;
+  color: #6b7280;
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -2502,7 +2530,8 @@ body {
 }
 
 .file-item__label-tag-remove:hover {
-  color: #ef4444;
+  color: #374151;
+  background: #e5e7eb;
 }
 
 /* Status Styles */
@@ -3082,7 +3111,7 @@ body {
   font-size: 12px;
   color: var(--muted);
   flex-shrink: 0;
-  min-width: 150px;
+  width: 150px;
 }
 
 .result-card__details li {
@@ -3119,6 +3148,7 @@ body {
   font-size: 11px;
   color: var(--muted);
   margin-right: 2px;
+  display: none;
 }
 
 .result-card__labels-item .tag {
