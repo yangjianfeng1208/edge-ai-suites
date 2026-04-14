@@ -144,13 +144,13 @@
     deleteBtn.addEventListener('click', () => handleDeleteFile(file.id));
     actionsCell.appendChild(deleteBtn);
 
-    // Append all cells
+    // Append all cells (order: checkbox, upload, filename, labels, type, size, time, actions)
     row.appendChild(checkCell);
+    row.appendChild(statusCell);
     row.appendChild(nameCell);
+    row.appendChild(labelsCell);
     row.appendChild(typeCell);
     row.appendChild(sizeCell);
-    row.appendChild(labelsCell);
-    row.appendChild(statusCell);
     row.appendChild(elapsedCell);
     row.appendChild(actionsCell);
 
@@ -498,11 +498,14 @@
         if (xhr.status >= 200 && xhr.status < 300) {
           const data = JSON.parse(xhr.responseText);
 
-          if (data.code === 20000) {
-            const taskId = data.data?.task_id;
+          // Check if we have a task_id (regardless of code)
+          const taskId = data.data?.task_id;
 
-            // If no task_id, file already exists - mark as completed
+          if (data.code === 20000 || taskId) {
+            // Success or file exists with task_id
+
             if (!taskId) {
+              // No task_id, file already exists - mark as completed
               fileManager.updateFile(fileId, {
                 status: FILE_STATUS.COMPLETED,
                 uploadedAt: new Date(),
@@ -513,7 +516,7 @@
               updateFileItem(fileId);
               setStatus(`${file.filename} already exists (skipped)`);
             } else {
-              // Normal flow - start processing
+              // Normal flow - start processing (works for both new and duplicate files)
               fileManager.updateFile(fileId, {
                 status: FILE_STATUS.QUEUED,
                 uploadedAt: new Date(),
@@ -521,7 +524,13 @@
                 xhr: null,
               });
               updateFileItem(fileId);
-              setStatus(`${file.filename} uploaded successfully`);
+
+              // Show appropriate message
+              const isDuplicate = data.message && data.message.toLowerCase().includes('already exists');
+              setStatus(isDuplicate
+                ? `${file.filename} already exists, checking status...`
+                : `${file.filename} uploaded successfully`);
+
               startTaskPolling(fileId, taskId);
             }
           } else {
@@ -567,12 +576,16 @@
     updateFileItem(fileId);
 
     fileManager.startPolling(fileId, taskId, (taskData) => {
-      if (!taskData) return;
+      if (!taskData) {
+        console.warn(`[Task Poll] No data for task ${taskId}`);
+        return;
+      }
 
       const file = fileManager.getFile(fileId);
       if (!file) return;
 
       const status = taskData.status;
+      console.log(`[Task Poll] File: ${file.filename}, Task: ${taskId}, Status: ${status}`, taskData);
 
       if (status === 'PENDING' || status === 'QUEUED') {
         fileManager.updateFile(fileId, {
@@ -603,6 +616,7 @@
           },
         });
         setStatus(`${file.filename} processing failed`);
+        console.error(`[Task Poll] Task failed:`, taskData);
       }
 
       updateFileItem(fileId);
@@ -624,10 +638,32 @@
   /**
    * Handle delete file
    */
-  function handleDeleteFile(fileId) {
+  async function handleDeleteFile(fileId) {
     const file = fileManager.getFile(fileId);
     if (!file) return;
 
+    // If file has a task_id (already uploaded), call backend to cleanup
+    if (file.taskId) {
+      try {
+        const response = await fetch(
+          `${window.API_BASE_URL || 'http://127.0.0.1:9011'}/api/v1/object/cleanup-task/${file.taskId}`,
+          { method: 'DELETE' }
+        );
+
+        if (!response.ok) {
+          console.warn(`Failed to cleanup task ${file.taskId}: HTTP ${response.status}`);
+          // Continue with frontend removal even if backend fails
+        } else {
+          const data = await response.json();
+          console.log(`Task ${file.taskId} cleaned up:`, data);
+        }
+      } catch (error) {
+        console.error(`Error cleaning up task ${file.taskId}:`, error);
+        // Continue with frontend removal even if backend fails
+      }
+    }
+
+    // Always remove from frontend
     fileManager.removeFile(fileId);
     renderFileList();
     setStatus(`${file.filename} removed`);

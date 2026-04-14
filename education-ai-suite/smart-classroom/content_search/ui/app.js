@@ -9,7 +9,7 @@
  */
 const API_BASE_URL = "http://127.0.0.1:9011";
 window.API_BASE_URL = API_BASE_URL; // Export for other scripts
-const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
+const HEALTH_CHECK_INTERVAL = 60000; // Check every 60 seconds (1 minute)
 const HEALTH_CHECK_TIMEOUT = 3000; // 3 second timeout for health check
 
 let healthCheckTimer = null;
@@ -29,8 +29,10 @@ function updateBackendStatusUI(status, message) {
   // Update text
   textEl.textContent = message;
 
-  // Show/hide retry button
-  retryBtn.hidden = status !== "offline";
+  // Always show retry button for manual check
+  if (retryBtn) {
+    retryBtn.hidden = false;
+  }
 
   currentBackendStatus = status;
 }
@@ -224,6 +226,8 @@ function openPreviewModal(result) {
     return;
   }
 
+  // Use inline=true for preview (browser displays), without for download
+  const previewUrl = `${API_BASE_URL}/api/v1/object/download?file_key=${encodeURIComponent(fileKey)}&inline=true`;
   const downloadUrl = `${API_BASE_URL}/api/v1/object/download?file_key=${encodeURIComponent(fileKey)}`;
 
   // Render preview based on type
@@ -247,7 +251,7 @@ function openPreviewModal(result) {
 
       // Preview content based on type
       if (result.type === 'video') {
-        const videoSrc = downloadUrl;
+        const videoSrc = previewUrl;
         const startTime = result.video_pin_second || 0;
 
         // Add hint if there's a specific timestamp
@@ -266,10 +270,20 @@ function openPreviewModal(result) {
           Your browser does not support the video tag.
         </video>`;
       } else if (result.type === 'image') {
-        content += `<img class="preview-image" src="${downloadUrl}" alt="${result.filename}">`;
+        content += `<img class="preview-image" src="${previewUrl}" alt="${result.filename}">`;
       } else if (result.type === 'document') {
         if (result.subtype === 'pdf') {
-          content += `<iframe class="preview-pdf" src="${downloadUrl}" type="application/pdf"></iframe>`;
+          // Show matched text context if available
+          if (result.chunk_text) {
+            content += `<div class="preview-context">
+              <div class="preview-context__label">Matched Content:</div>
+              <div class="preview-context__text">"${result.chunk_text}"</div>
+            </div>`;
+          }
+          // Show PDF viewer (use previewUrl for inline display)
+          content += `<div class="preview-pdf-container">
+            <iframe class="preview-pdf" src="${previewUrl}" type="application/pdf"></iframe>
+          </div>`;
         } else if (result.summary) {
           content += `<div class="preview-text">${result.summary}</div>`;
         } else {
@@ -337,6 +351,14 @@ function closePreviewModal() {
 }
 
 function renderResults(listEl, metaEl, results, metaText) {
+  const resultsContainer = el("results-container");
+
+  // Update data-empty attribute to control header visibility
+  if (resultsContainer) {
+    const isEmpty = !results || results.length === 0;
+    resultsContainer.setAttribute("data-empty", isEmpty ? "true" : "false");
+  }
+
   metaEl.textContent = metaText;
   listEl.innerHTML = "";
   results.forEach((r) => {
@@ -347,16 +369,11 @@ function renderResults(listEl, metaEl, results, metaText) {
     const header = document.createElement("div");
     header.className = "result-card__header";
 
-    // Filename container with preview icon
+    // Filename container with preview icon (icon on left)
     const filenameContainer = document.createElement("div");
     filenameContainer.className = "result-card__filename-container";
 
-    const filename = document.createElement("h4");
-    filename.className = "result-card__filename";
-    filename.textContent = r.filename || r.title || "Unknown";
-    filename.title = r.filename; // Show full name on hover
-
-    // Preview icon button
+    // Preview icon button (moved to left)
     const previewIcon = document.createElement("button");
     previewIcon.className = "result-card__preview-icon";
     previewIcon.type = "button";
@@ -370,8 +387,13 @@ function renderResults(listEl, metaEl, results, metaText) {
       openPreviewModal(r);
     });
 
-    filenameContainer.appendChild(filename);
+    const filename = document.createElement("h4");
+    filename.className = "result-card__filename";
+    filename.textContent = r.filename || r.title || "Unknown";
+    filename.title = r.filename; // Show full name on hover
+
     filenameContainer.appendChild(previewIcon);
+    filenameContainer.appendChild(filename);
 
     const scoreEl = document.createElement("span");
     const sv = typeof r.score === "number" ? r.score : null;
@@ -578,41 +600,105 @@ function filterResultsByType(results, filterValue) {
   const queryImagePreviewImg = el("query-image-preview-img");
   const queryImagePreviewName = el("query-image-preview-name");
   const queryImageClearBtn = el("query-image-clear");
-  const topKEl = el("topk");
+  const topKSelectEl = el("topk-select");
 
-  /** @type {"text" | "image"} */
-  let queryMode = "text";
+  // Auto-resize textarea based on content
+  function autoResizeTextarea() {
+    if (!queryTextEl) return;
 
-  // Search type multi-select
+    // Reset height to min-height to get accurate scrollHeight
+    queryTextEl.style.height = 'auto';
+
+    // Calculate new height based on content
+    const newHeight = Math.max(68, queryTextEl.scrollHeight); // 68px is min-height (2 rows)
+    queryTextEl.style.height = newHeight + 'px';
+  }
+
+  // Initialize textarea height and add event listeners
+  if (queryTextEl) {
+    autoResizeTextarea();
+    queryTextEl.addEventListener('input', autoResizeTextarea);
+    // Also resize on paste
+    queryTextEl.addEventListener('paste', () => {
+      setTimeout(autoResizeTextarea, 0);
+    });
+  }
+
+  // Search type checkboxes and dropdown
   const typeDocEl = el("type-document");
   const typeImgEl = el("type-image");
   const typeVidEl = el("type-video");
   const typeDocLabel = typeDocEl?.closest("label");
+  const typesDropdown = el("types-dropdown");
+  const typesDropdownBtn = el("types-dropdown-btn");
+  const typesDropdownMenu = el("types-dropdown-menu");
+  const typesDropdownLabel = el("types-dropdown-label");
+
+  /** @type {"text" | "image"} */
+  let queryMode = "text";
 
   let docCheckedBeforeImageMode = true;
 
+  // Update dropdown label based on selected types
+  const updateTypesDropdownLabel = () => {
+    const selected = getSelectedTypes();
+    if (selected.length === 0) {
+      typesDropdownLabel.textContent = "Types";
+    } else if (selected.length === 3) {
+      typesDropdownLabel.textContent = "All Types";
+    } else {
+      typesDropdownLabel.textContent = selected.length === 1 ? selected[0] : `${selected.length} types`;
+    }
+  };
+
+  // Toggle dropdown menu
+  typesDropdownBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = !typesDropdownMenu.hidden;
+    typesDropdownMenu.hidden = isOpen;
+    typesDropdown?.classList.toggle("is-open", !isOpen);
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    if (typesDropdown && !typesDropdown.contains(e.target)) {
+      typesDropdownMenu.hidden = true;
+      typesDropdown.classList.remove("is-open");
+    }
+  });
+
+  // Update label when checkboxes change
+  [typeDocEl, typeImgEl, typeVidEl].forEach(checkbox => {
+    checkbox?.addEventListener("change", () => {
+      updateTypesDropdownLabel();
+    });
+  });
+
+  // Get selected types from checkboxes
   const getSelectedTypes = () => {
     const selected = [];
-    if (typeDocEl.checked) selected.push("document");
-    if (typeImgEl.checked) selected.push("image");
-    if (typeVidEl.checked) selected.push("video");
+    if (typeDocEl?.checked) selected.push("document");
+    if (typeImgEl?.checked) selected.push("image");
+    if (typeVidEl?.checked) selected.push("video");
     return selected;
   };
 
+  // Enforce type rules for image query mode
   const enforceTypeRulesForMode = (mode) => {
     if (mode === "image") {
       // Image query: allow only image/video (document not supported).
-      docCheckedBeforeImageMode = typeDocEl.checked;
-      typeDocEl.checked = false;
-      typeDocEl.disabled = true;
+      docCheckedBeforeImageMode = typeDocEl?.checked || false;
+      if (typeDocEl) typeDocEl.checked = false;
+      if (typeDocEl) typeDocEl.disabled = true;
       typeDocLabel?.classList.add("is-disabled");
       typeDocLabel?.setAttribute("aria-disabled", "true");
     } else {
-      typeDocEl.disabled = false;
+      if (typeDocEl) typeDocEl.disabled = false;
       typeDocLabel?.classList.remove("is-disabled");
       typeDocLabel?.removeAttribute("aria-disabled");
-      typeDocEl.checked = Boolean(docCheckedBeforeImageMode);
+      if (typeDocEl) typeDocEl.checked = Boolean(docCheckedBeforeImageMode);
     }
+    updateTypesDropdownLabel(); // Update dropdown label after changing types
   };
 
   const setQueryMode = (mode) => {
@@ -673,15 +759,7 @@ function filterResultsByType(results, filterValue) {
     }
   });
 
-  // Keep TopK within 1..10 even when users type via keyboard.
-  topKEl.addEventListener("input", () => {
-    clampIntegerInInput(topKEl, { min: 1, max: 10, fallback: 10 });
-  });
-  topKEl.addEventListener("blur", () => {
-    // On blur, force an empty value back to a safe default.
-    if (String(topKEl.value ?? "").trim() === "") topKEl.value = "10";
-    clampIntegerInInput(topKEl, { min: 1, max: 10, fallback: 10 });
-  });
+  // Top K is now a select dropdown, no validation needed
 
   const renderFilteredResults = () => {
     const filtered = filterResultsByType(lastResults, resultsFilterEl?.value);
@@ -809,18 +887,23 @@ function filterResultsByType(results, filterValue) {
     }
 
     if (type === "document") {
-      // Check if it's a video summary
-      if (meta.chunk_id || meta.chunk_text) {
-        result.subtype = "video_summary";
-        result.chunk_id = meta.chunk_id;
-      } else if (meta.doc_filetype === "application/pdf" || meta.doc_page_number !== undefined) {
+      // Priority: Check if it's a PDF first (has doc_filetype or doc_page_number)
+      if (meta.doc_filetype === "application/pdf" || meta.doc_page_number !== undefined) {
         result.subtype = "pdf";
         // Handle page information
         if (meta.doc_page_number !== undefined) {
-          result.page = `Page: ${meta.doc_page_number}`;
+          result.page = `Page ${meta.doc_page_number}`;
         } else if (meta.page_range) {
           result.page = meta.page_range;
         }
+        // Keep chunk_text for context
+        if (meta.chunk_text) {
+          result.chunk_text = meta.chunk_text;
+        }
+      } else if (meta.chunk_id || meta.chunk_text) {
+        // Then check if it's a video summary
+        result.subtype = "video_summary";
+        result.chunk_id = meta.chunk_id;
       } else {
         result.subtype = "txt";
       }
@@ -847,7 +930,7 @@ function filterResultsByType(results, filterValue) {
 
   el("btn-search").addEventListener("click", async () => {
     const selectedTypes = getSelectedTypes();
-    const topK = Number.parseInt(topKEl.value, 10);
+    const topK = Number.parseInt(topKSelectEl?.value || "4", 10);
     const textQuery = el("query-text").value || "";
     const imageFile = queryImage.getFile();
 
@@ -869,8 +952,7 @@ function filterResultsByType(results, filterValue) {
       return;
     }
 
-    const safeTopK = Number.isFinite(topK) ? Math.max(1, Math.min(10, topK)) : 10;
-    topKEl.value = String(safeTopK);
+    const safeTopK = Number.isFinite(topK) ? Math.max(1, Math.min(10, topK)) : 4;
 
     // Build filter object
     const filter = {};
@@ -925,10 +1007,11 @@ function filterResultsByType(results, filterValue) {
 
     setQueryMode("text");
 
-    typeDocEl.checked = true;
-    typeImgEl.checked = true;
-    typeVidEl.checked = true;
-    el("topk").value = "4";
+    if (typeDocEl) typeDocEl.checked = true;
+    if (typeImgEl) typeImgEl.checked = true;
+    if (typeVidEl) typeVidEl.checked = true;
+    if (topKSelectEl) topKSelectEl.value = "4";
+    updateTypesDropdownLabel(); // Update dropdown label
 
     setStatus(searchStatus, "");
     resultsMeta.textContent = "";
@@ -936,11 +1019,21 @@ function filterResultsByType(results, filterValue) {
     if (resultsFilterEl) resultsFilterEl.value = "all";
     lastResults = [];
     lastResultsMetaText = "";
+
+    // Mark results container as empty
+    const resultsContainer = el("results-container");
+    if (resultsContainer) {
+      resultsContainer.setAttribute("data-empty", "true");
+    }
+
+    // Reset textarea height
+    autoResizeTextarea();
   });
 
   // Initialize UI state
   setQueryMode("text");
   renderLabelTags(); // Initialize with no tags
+  updateTypesDropdownLabel(); // Initialize dropdown label
 
   // Setup preview modal close handlers
   const previewModalClose = el("preview-modal-close");
@@ -978,7 +1071,7 @@ function filterResultsByType(results, filterValue) {
   startHealthCheck();
 })();
 
-// Focus mode - click panels to expand them
+// Focus mode - click card headers to expand them
 (function initFocusMode() {
   const mainContainer = document.querySelector('.main');
   const cards = document.querySelectorAll('.main > .card');
@@ -986,9 +1079,18 @@ function filterResultsByType(results, filterValue) {
   if (!mainContainer || cards.length !== 2) return;
 
   const [leftCard, rightCard] = cards;
+  const leftHeader = leftCard.querySelector('.card__header');
+  const rightHeader = rightCard.querySelector('.card__header');
+
+  if (!leftHeader || !rightHeader) return;
+
   let currentFocus = null; // 'left', 'right', or null
 
-  leftCard.addEventListener('click', () => {
+  // Add pointer cursor to headers
+  leftHeader.style.cursor = 'pointer';
+  rightHeader.style.cursor = 'pointer';
+
+  leftHeader.addEventListener('click', () => {
     if (currentFocus === 'left') {
       // Click again to reset
       mainContainer.classList.remove('focus-left');
@@ -1001,7 +1103,7 @@ function filterResultsByType(results, filterValue) {
     }
   });
 
-  rightCard.addEventListener('click', () => {
+  rightHeader.addEventListener('click', () => {
     if (currentFocus === 'right') {
       // Click again to reset
       mainContainer.classList.remove('focus-right');
