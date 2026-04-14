@@ -29,7 +29,7 @@ body {
 }
 
 .container {
-  width: min(1100px, calc(100% - 32px));
+  width: min(1600px, calc(100% - 64px));
   margin: 0 auto;
 }
 
@@ -186,7 +186,25 @@ body {
 .main {
   padding: 20px 0 28px;
   display: grid;
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  transition: grid-template-columns 0.3s ease;
+}
+
+/* Focus modes - when clicking on a panel to expand it */
+.main.focus-left {
+  grid-template-columns: 2fr 1fr;
+}
+
+.main.focus-right {
+  grid-template-columns: 1fr 2fr;
+}
+
+@media (max-width: 1200px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -502,54 +520,127 @@ body {
   box-shadow: 0 0 0 2px rgba(0, 104, 181, 0.2);
 }
 
-.queryrow {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+/* Unified Query Input */
+.query-unified {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.query-unified__input {
+  flex: 1;
+  width: 100%;
+  padding: 10px 48px 10px 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #111827;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.query-unified__input:focus {
+  outline: none;
+  border-color: #0068b5;
+  box-shadow: 0 0 0 2px rgba(0, 104, 181, 0.15);
+}
+
+.query-unified__input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.query-unified__file {
+  display: none;
+}
+
+.query-unified__attach {
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.query-unified__attach:hover {
+  background: rgba(0, 104, 181, 0.08);
+  color: #0068b5;
+}
+
+.query-unified__attach:active {
+  transform: scale(0.95);
+}
+
+/* Query Image Preview */
+.query-image-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.query-image-preview__content {
+  display: flex;
   gap: 12px;
   align-items: center;
 }
 
-@media (max-width: 920px) {
-  .queryrow {
-    grid-template-columns: 1fr;
-  }
-  .queryor {
-    display: none;
-  }
+.query-image-preview__img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
 }
 
-.queryor {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.6px;
-  padding: 0 2px;
-}
-
-.queryitem {
-  display: grid;
-  gap: 6px;
-}
-
-.queryitem__head {
-  display: inline-flex;
-  gap: 8px;
+.query-image-preview__info {
+  flex: 1;
+  display: flex;
   align-items: center;
-  color: var(--muted);
-  font-size: 12px;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.queryitem__label {
-  font-weight: 650;
+.query-image-preview__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.queryitem.is-disabled {
-  opacity: 0.55;
+.query-image-preview__remove {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #6b7280;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
 }
 
-.queryitem.is-disabled .input,
-.queryitem.is-disabled .button {
-  cursor: not-allowed;
+.query-image-preview__remove:hover {
+  background: rgba(220, 53, 69, 0.08);
+  border-color: #dc3545;
+  color: #dc3545;
 }
 
 .checkgroup {
@@ -909,6 +1000,97 @@ body {
 .tag__remove:hover {
   background: color-mix(in srgb, CanvasText 15%, transparent);
   color: var(--fg);
+}
+
+/* ──  Label Tags Input (for search filters) ────────────────── */
+.label-tags-input {
+  width: 100%;
+}
+
+.label-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  min-height: 52px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  align-items: center;
+}
+
+.label-tag-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed #9ca3af;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.label-tag-add:hover {
+  border-color: #0068b5;
+  border-style: solid;
+  background: rgba(0, 104, 181, 0.05);
+  color: #0068b5;
+}
+
+.label-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 104, 181, 0.1);
+  border: 1px solid rgba(0, 104, 181, 0.3);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0068b5;
+  max-width: 200px;
+}
+
+.label-tag-item__input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0068b5;
+  outline: none;
+  min-width: 60px;
+  max-width: 150px;
+}
+
+.label-tag-item__input::placeholder {
+  color: rgba(0, 104, 181, 0.5);
+}
+
+.label-tag-item__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #0068b5;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: all 0.15s;
+}
+
+.label-tag-item__remove:hover {
+  opacity: 1;
+  background: rgba(0, 104, 181, 0.15);
 }
 
 /* ── Label Filter Dropdown (Excel-style) ────────────────────── */
@@ -1698,7 +1880,7 @@ body {
 /* File List Columns Header */
 .file-list-columns {
   display: grid;
-  grid-template-columns: 40px 1fr 100px 100px 180px 100px 80px;
+  grid-template-columns: 40px 1fr 100px 100px 150px 180px 100px 80px;
   gap: 12px;
   padding: 12px 16px;
   background: #f3f4f6;
@@ -1765,7 +1947,7 @@ body {
 
 .file-item__row {
   display: grid;
-  grid-template-columns: 40px 1fr 100px 100px 180px 100px 80px;
+  grid-template-columns: 40px 1fr 100px 100px 150px 180px 100px 80px;
   gap: 12px;
   padding: 12px 16px;
   align-items: center;
@@ -1819,6 +2001,81 @@ body {
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
+}
+
+.file-item__labels-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.file-item__label-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px dashed #d1d5db;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.file-item__label-add:hover {
+  border-color: #0068b5;
+  color: #0068b5;
+  background: rgba(0, 104, 181, 0.05);
+}
+
+.file-item__label-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 104, 181, 0.1);
+  border: 1px solid rgba(0, 104, 181, 0.2);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #0068b5;
+  max-width: 120px;
+}
+
+.file-item__label-tag input {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  width: 100%;
+  min-width: 40px;
+}
+
+.file-item__label-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0068b5;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.file-item__label-tag-remove:hover {
+  color: #ef4444;
 }
 
 /* Status Styles */
@@ -2032,23 +2289,19 @@ body {
 @media (max-width: 1024px) {
   .file-list-columns,
   .file-item__row {
-    grid-template-columns: 40px 1fr 80px 140px 80px 60px;
+    grid-template-columns: 40px 1fr 80px 120px 140px 80px 60px;
   }
 
   .file-list-col--type,
   .file-item__type {
     display: none;
   }
-
-  .file-item__labels {
-    padding-left: 56px;
-  }
 }
 
 @media (max-width: 768px) {
   .file-list-columns,
   .file-item__row {
-    grid-template-columns: 40px 1fr 120px 60px;
+    grid-template-columns: 40px 1fr 100px 120px 60px;
   }
 
   .file-list-col--size,
@@ -2056,14 +2309,6 @@ body {
   .file-list-col--elapsed,
   .file-item__elapsed {
     display: none;
-  }
-
-  .labels-input-row {
-    flex-direction: column;
-  }
-
-  .labels-input-row .button {
-    width: 100%;
   }
 }
 

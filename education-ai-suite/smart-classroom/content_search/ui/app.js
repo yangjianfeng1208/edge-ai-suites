@@ -172,50 +172,10 @@ function formatTimestamp(totalSeconds) {
 
 function setupQueryImage() {
   const input = el("query-image");
-  const preview = el("query-image-preview");
-  const empty = el("query-image-preview-empty");
-  const img = el("query-image-preview-img");
-  const clearBtn = el("query-image-clear");
-
-  let objectUrl = null;
 
   const clear = () => {
     input.value = "";
-    empty.hidden = false;
-    img.hidden = true;
-    clearBtn.hidden = true;
-    img.removeAttribute("src");
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-      objectUrl = null;
-    }
   };
-
-  input.addEventListener("change", () => {
-    const file = input.files?.[0];
-    if (!file) {
-      clear();
-      return;
-    }
-
-    // Enforce .jpg for query image.
-    const ext = fileExtension(file.name);
-    const mime = String(file.type || "").toLowerCase();
-    const isJpg = ext === ".jpg" || mime === "image/jpeg";
-    if (!isJpg) {
-      clear();
-      return;
-    }
-
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = URL.createObjectURL(file);
-    img.src = objectUrl;
-    empty.hidden = true;
-    img.hidden = false;
-    clearBtn.hidden = false;
-  });
-
-  clearBtn.addEventListener("click", clear);
 
   return {
     getFile: () => input.files?.[0] || null,
@@ -510,145 +470,114 @@ function filterResultsByType(results, filterValue) {
   /** @type {string} */
   let lastResultsMetaText = "";
 
-  // Global pool of all labels (populated from fileManager in app_ui_renderer_v3.js)
+  // Global pool of all labels (populated from fileManager in app_ui_renderer.js)
   const availableLabels = window.fileManagerUI?.fileManager?.availableLabels || new Set();
   const NO_LABEL_KEY = "__no_label__";
   const searchSelectedLabels = new Set();
-  const labelDropdownBtn = el("label-dropdown-btn");
-  const labelDropdownPanel = el("label-dropdown-panel");
-  const labelDropdownList = el("label-dropdown-list");
-  const labelDropdownSelectAllCb = el("label-dropdown-selectall");
-  const labelSelectedChipsEl = el("label-selected-chips");
 
-  const updateDropdownSummary = () => {
-    // +1 accounts for the permanent "No Label" option
-    const total = availableLabels.size + 1;
-    const selected = searchSelectedLabels.size;
-    const summaryEl = el("label-dropdown-summary");
-    if (total === 1 && availableLabels.size === 0) {
-      // Only the No Label option exists (no real labels uploaded yet)
-      if (selected === 0) {
-        summaryEl.textContent = "All Labels";
-      } else {
-        summaryEl.textContent = "No Label";
+  // New tag input UI elements
+  const labelTagsList = el("label-tags-list");
+  const labelTagAddBtn = el("label-tag-add-btn");
+
+  /**
+   * Create a new editable tag
+   */
+  function createEditableTag(initialValue = "") {
+    const tag = document.createElement("div");
+    tag.className = "label-tag-item";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "label-tag-item__input";
+    input.placeholder = "Enter label...";
+    input.value = initialValue;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "label-tag-item__remove";
+    removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>`;
+
+    removeBtn.addEventListener("click", () => {
+      const value = input.value.trim();
+      if (value) {
+        searchSelectedLabels.delete(value);
       }
-    } else if (selected === 0 || selected === total) {
-      summaryEl.textContent = "All Labels";
-    } else {
-      summaryEl.textContent = `${selected} of ${total} selected`;
-    }
-    labelDropdownBtn.disabled = false;
-  };
-
-  const makeDropdownItem = (key, displayText, isSpecial = false) => {
-    const li = document.createElement("li");
-    li.className = "label-dropdown__item" + (isSpecial ? " label-dropdown__item--special" : "");
-    const cbId = `ldf-${key.replace(/[^a-zA-Z0-9]/g, "-")}`;
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.id = cbId;
-    cb.className = "label-dropdown__cb";
-    cb.checked = searchSelectedLabels.has(key);
-    cb.addEventListener("change", () => {
-      if (cb.checked) {
-        searchSelectedLabels.add(key);
-      } else {
-        searchSelectedLabels.delete(key);
-      }
-      renderSearchLabelFilter();
-    });
-    const lbl = document.createElement("label");
-    lbl.htmlFor = cbId;
-    lbl.className = "label-dropdown__label";
-    lbl.textContent = displayText;
-    li.append(cb, lbl);
-    return li;
-  };
-
-  const renderSearchLabelFilter = () => {
-    labelDropdownList.innerHTML = "";
-    const total = availableLabels.size + 1; // +1 for No Label
-    const selected = searchSelectedLabels.size;
-    labelDropdownSelectAllCb.checked = selected === total;
-    labelDropdownSelectAllCb.indeterminate = selected > 0 && selected < total;
-
-    // Always-present "No Label" item at the top
-    labelDropdownList.appendChild(makeDropdownItem(NO_LABEL_KEY, "(No Label)", true));
-
-    // Separator between special item and real labels
-    if (availableLabels.size > 0) {
-      const sep = document.createElement("li");
-      sep.className = "label-dropdown__item-sep";
-      sep.setAttribute("role", "separator");
-      labelDropdownList.appendChild(sep);
-    }
-
-    availableLabels.forEach((label) => {
-      labelDropdownList.appendChild(makeDropdownItem(label, label));
+      tag.remove();
     });
 
-    updateDropdownSummary();
+    // When user types, update the set
+    input.addEventListener("blur", () => {
+      const oldValue = input.dataset.oldValue || "";
+      const newValue = input.value.trim();
 
-    // Render selected chips below the dropdown
-    labelSelectedChipsEl.innerHTML = "";
-    if (searchSelectedLabels.size === 0) {
-      labelSelectedChipsEl.hidden = true;
-    } else {
-      labelSelectedChipsEl.hidden = false;
-      searchSelectedLabels.forEach((key) => {
-        const chip = document.createElement("span");
-        chip.className = "label-sel-chip";
-        const text = document.createElement("span");
-        text.textContent = key === NO_LABEL_KEY ? "(No Label)" : key;
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "label-sel-chip__remove";
-        removeBtn.setAttribute("aria-label", `Remove ${text.textContent}`);
-        removeBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-        removeBtn.addEventListener("click", () => {
-          searchSelectedLabels.delete(key);
-          renderSearchLabelFilter();
-        });
-        chip.append(text, removeBtn);
-        labelSelectedChipsEl.appendChild(chip);
-      });
-    }
-  };
+      if (oldValue && oldValue !== newValue) {
+        searchSelectedLabels.delete(oldValue);
+      }
 
-  // Toggle dropdown open/close
-  labelDropdownBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = !labelDropdownPanel.hidden;
-    labelDropdownPanel.hidden = isOpen;
-    labelDropdownBtn.setAttribute("aria-expanded", String(!isOpen));
+      if (newValue) {
+        searchSelectedLabels.add(newValue);
+        input.dataset.oldValue = newValue;
+      } else {
+        tag.remove();
+      }
+    });
+
+    // Enter key to confirm
+    input.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        input.blur();
+      }
+    });
+
+    tag.appendChild(input);
+    tag.appendChild(removeBtn);
+
+    return { tag, input };
+  }
+
+  /**
+   * Add a new tag input
+   */
+  labelTagAddBtn?.addEventListener("click", () => {
+    const { tag, input } = createEditableTag();
+    labelTagsList.insertBefore(tag, labelTagAddBtn);
+    input.focus();
   });
 
-  // Select All / Clear All
-  labelDropdownSelectAllCb.addEventListener("change", () => {
-    if (labelDropdownSelectAllCb.checked) {
-      searchSelectedLabels.add(NO_LABEL_KEY);
-      availableLabels.forEach((l) => searchSelectedLabels.add(l));
-    } else {
-      searchSelectedLabels.clear();
-    }
-    renderSearchLabelFilter();
-  });
+  /**
+   * Render existing tags from searchSelectedLabels
+   */
+  function renderLabelTags() {
+    // Clear existing tags (but keep the + button)
+    const existingTags = labelTagsList.querySelectorAll(".label-tag-item");
+    existingTags.forEach((t) => t.remove());
 
-  // Close dropdown when clicking outside
-  document.addEventListener("click", (e) => {
-    if (!el("label-dropdown").contains(e.target)) {
-      labelDropdownPanel.hidden = true;
-      labelDropdownBtn.setAttribute("aria-expanded", "false");
-    }
-  });
+    // Re-render from set
+    searchSelectedLabels.forEach((label) => {
+      if (label && label !== NO_LABEL_KEY) {
+        const { tag } = createEditableTag(label);
+        tag.querySelector("input").dataset.oldValue = label;
+        labelTagsList.insertBefore(tag, labelTagAddBtn);
+      }
+    });
+  }
+
+  // Old dropdown functions removed - using tag input now
+
+  // Old dropdown render function removed
+
+  // Old dropdown event listeners removed - using tag input now
 
   const queryImage = setupQueryImage();
   const queryTextEl = el("query-text");
   const queryImageEl = el("query-image");
-  const modeTextBtn = el("mode-text");
-  const modeImageBtn = el("mode-image");
-  const queryTextWrap = el("query-text-wrap");
-  const queryImageWrap = el("query-image-wrap");
+  const queryAttachBtn = el("query-attach-btn");
+  const queryImagePreviewContainer = el("query-image-preview-container");
+  const queryImagePreviewImg = el("query-image-preview-img");
+  const queryImagePreviewName = el("query-image-preview-name");
+  const queryImageClearBtn = el("query-image-clear");
   const topKEl = el("topk");
 
   /** @type {"text" | "image"} */
@@ -688,52 +617,59 @@ function filterResultsByType(results, filterValue) {
 
   const setQueryMode = (mode) => {
     queryMode = mode;
+    const isImage = mode === "image";
 
-    const isText = mode === "text";
-    modeTextBtn.classList.toggle("is-active", isText);
-    modeImageBtn.classList.toggle("is-active", !isText);
-    modeTextBtn.setAttribute("aria-selected", String(isText));
-    modeImageBtn.setAttribute("aria-selected", String(!isText));
-
-    queryTextWrap.classList.toggle("is-disabled", !isText);
-    queryImageWrap.classList.toggle("is-disabled", isText);
-    queryImageWrap.setAttribute("aria-disabled", String(isText));
-
-    queryTextEl.disabled = !isText;
-    queryImageEl.disabled = isText;
-
-    if (isText) {
-      queryImage.clear();
-      queryTextEl.focus();
-    } else {
+    // Disable text input when image is selected
+    queryTextEl.disabled = isImage;
+    if (isImage) {
       queryTextEl.value = "";
-      queryTextEl.blur();
-      queryImageEl.focus();
+      queryTextEl.placeholder = "Image search active...";
+    } else {
+      queryTextEl.placeholder = "Type your query or upload an image...";
     }
 
     enforceTypeRulesForMode(mode);
   };
 
-  // Query mode toggle makes the mutual exclusivity explicit.
-  modeTextBtn.addEventListener("click", () => setQueryMode("text"));
-  modeImageBtn.addEventListener("click", () => setQueryMode("image"));
+  // Attach button click - trigger file input
+  queryAttachBtn?.addEventListener("click", () => {
+    queryImageEl.click();
+  });
 
-  // Also allow clicking the panels to switch mode.
-  queryTextWrap.addEventListener("click", () => setQueryMode("text"));
-  queryImageWrap.addEventListener("click", () => setQueryMode("image"));
+  // Image file selected
+  queryImageEl.addEventListener("change", () => {
+    const file = queryImage.getFile();
+    if (file) {
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        queryImagePreviewImg.src = e.target.result;
+        queryImagePreviewName.textContent = file.name;
+        queryImagePreviewContainer.hidden = false;
+      };
+      reader.readAsDataURL(file);
 
-  // If user starts typing, switch to text mode.
-  queryTextEl.addEventListener("input", () => {
-    if ((queryTextEl.value || "").trim().length > 0 && queryMode !== "text") {
-      setQueryMode("text");
+      // Switch to image mode
+      setQueryMode("image");
     }
   });
 
-  // If user picks an image, switch to image mode.
-  queryImageEl.addEventListener("change", () => {
-    const hasImage = Boolean(queryImage.getFile());
-    if (hasImage && queryMode !== "image") {
-      setQueryMode("image");
+  // Clear image button
+  queryImageClearBtn?.addEventListener("click", () => {
+    queryImage.clear();
+    queryImageEl.value = "";
+    queryImagePreviewContainer.hidden = true;
+    setQueryMode("text");
+  });
+
+  // If user starts typing, clear image if present
+  queryTextEl.addEventListener("input", () => {
+    if ((queryTextEl.value || "").trim().length > 0 && queryMode === "image") {
+      // User is typing, clear image
+      queryImage.clear();
+      queryImageEl.value = "";
+      queryImagePreviewContainer.hidden = true;
+      setQueryMode("text");
     }
   });
 
@@ -980,12 +916,12 @@ function filterResultsByType(results, filterValue) {
 
   el("btn-reset").addEventListener("click", () => {
     searchSelectedLabels.clear();
-    if (labelDropdownPanel) labelDropdownPanel.hidden = true;
-    if (labelDropdownBtn) labelDropdownBtn.setAttribute("aria-expanded", "false");
-    renderSearchLabelFilter();
+    renderLabelTags(); // Clear all label tags
 
     el("query-text").value = "";
     queryImage.clear();
+    queryImageEl.value = "";
+    queryImagePreviewContainer.hidden = true;
 
     setQueryMode("text");
 
@@ -1004,7 +940,7 @@ function filterResultsByType(results, filterValue) {
 
   // Initialize UI state
   setQueryMode("text");
-  renderSearchLabelFilter();
+  renderLabelTags(); // Initialize with no tags
 
   // Setup preview modal close handlers
   const previewModalClose = el("preview-modal-close");
@@ -1040,4 +976,41 @@ function filterResultsByType(results, filterValue) {
 
   // Start backend health check
   startHealthCheck();
+})();
+
+// Focus mode - click panels to expand them
+(function initFocusMode() {
+  const mainContainer = document.querySelector('.main');
+  const cards = document.querySelectorAll('.main > .card');
+
+  if (!mainContainer || cards.length !== 2) return;
+
+  const [leftCard, rightCard] = cards;
+  let currentFocus = null; // 'left', 'right', or null
+
+  leftCard.addEventListener('click', () => {
+    if (currentFocus === 'left') {
+      // Click again to reset
+      mainContainer.classList.remove('focus-left');
+      currentFocus = null;
+    } else {
+      // Focus left panel
+      mainContainer.classList.remove('focus-right');
+      mainContainer.classList.add('focus-left');
+      currentFocus = 'left';
+    }
+  });
+
+  rightCard.addEventListener('click', () => {
+    if (currentFocus === 'right') {
+      // Click again to reset
+      mainContainer.classList.remove('focus-right');
+      currentFocus = null;
+    } else {
+      // Focus right panel
+      mainContainer.classList.remove('focus-left');
+      mainContainer.classList.add('focus-right');
+      currentFocus = 'right';
+    }
+  });
 })();

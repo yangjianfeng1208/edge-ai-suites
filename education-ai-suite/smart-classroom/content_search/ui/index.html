@@ -69,21 +69,6 @@
               </div>
             </div>
 
-            <!-- Labels Input Section -->
-            <div class="labels-section" id="labels-section">
-              <label class="labels-section__label">Labels</label>
-              <div class="labels-input-row">
-                <input
-                  type="text"
-                  class="input labels-input"
-                  id="labels-input"
-                  placeholder="Press Enter to separate multiple labels, e.g. Math English"
-                  autocomplete="off"
-                />
-                <button class="button button--primary" id="btn-add-to-selected" type="button">Add to selected</button>
-              </div>
-            </div>
-
             <!-- File List Header -->
             <div class="file-list-columns">
               <div class="file-list-col file-list-col--check">
@@ -92,6 +77,7 @@
               <div class="file-list-col file-list-col--name">File name</div>
               <div class="file-list-col file-list-col--type">Type</div>
               <div class="file-list-col file-list-col--size">Size</div>
+              <div class="file-list-col file-list-col--labels">Labels</div>
               <div class="file-list-col file-list-col--status">Upload Status</div>
               <div class="file-list-col file-list-col--elapsed">Elapsed Time</div>
               <div class="file-list-col file-list-col--actions">
@@ -142,76 +128,54 @@
 
         <div class="grid grid--2">
           <div class="field field--span2">
-            <div class="labelrow">
-              <label class="label">Query</label>
-              <span class="muted">Choose one: Text or Image</span>
-            </div>
+            <label class="label">Query</label>
 
-            <div style="display: flex;">
-              <div class="segmented" role="tablist" aria-label="Query mode">
-              <button class="segmented__btn is-active" id="mode-text" type="button" role="tab" aria-selected="true" data-mode="text">
-                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            <!-- Unified Query Input -->
+            <div class="query-unified">
+              <input
+                class="query-unified__input"
+                id="query-text"
+                type="text"
+                placeholder="Type your query or upload an image..."
+                autocomplete="off"
+              />
+              <input
+                class="query-unified__file"
+                id="query-image"
+                type="file"
+                accept=".jpg,.jpeg,image/jpeg"
+                hidden
+              />
+              <button
+                class="query-unified__attach"
+                id="query-attach-btn"
+                type="button"
+                title="Upload image for visual search"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
                 </svg>
-                <span>Text</span>
-              </button>
-              <button class="segmented__btn" id="mode-image" type="button" role="tab" aria-selected="false" data-mode="image">
-                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                  <path
-                    d="M3.5 4.5h9A1 1 0 0 1 13.5 5.5v7A1 1 0 0 1 12.5 13.5h-9A1 1 0 0 1 2.5 12.5v-7A1 1 0 0 1 3.5 4.5Z"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                  />
-                  <path d="M5 11l2-2 2 2 1.5-1.5L13.5 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M6 7a1 1 0 1 0 0.001 0Z" fill="currentColor" />
-                </svg>
-                <span>Image</span>
               </button>
             </div>
-            </div>
 
-            <div class="queryrow" aria-label="Text or Image query">
-              <div class="queryitem" id="query-text-wrap">
-                <div class="queryitem__head">
-                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M3 4h10M3 8h10M3 12h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  </svg>
-                  <span class="queryitem__label">Text</span>
-                </div>
-                <input class="input" id="query-text" type="text" placeholder="Type your query..." autocomplete="off" />
-              </div>
-
-              <div class="queryor" aria-hidden="true">OR</div>
-
-              <div class="queryitem is-disabled" id="query-image-wrap" aria-disabled="true">
-                <div class="queryitem__head">
-                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M3.5 4.5h9A1 1 0 0 1 13.5 5.5v7A1 1 0 0 1 12.5 13.5h-9A1 1 0 0 1 2.5 12.5v-7A1 1 0 0 1 3.5 4.5Z"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.2"
-                    />
-                    <path d="M5 11l2-2 2 2 1.5-1.5L13.5 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M6 7a1 1 0 1 0 0.001 0Z" fill="currentColor" />
-                  </svg>
-                  <span class="queryitem__label">Image</span>
-                </div>
-                <div class="muted" style="font-size: 12px;">
-                  Image query searches by visual similarity. Supported: .jpg
-                </div>
-                <input class="input" id="query-image" type="file" accept=".jpg,image/jpeg" disabled />
-                <div class="preview" id="query-image-preview">
-                  <div class="muted" id="query-image-preview-empty">No image selected</div>
-                  <img class="preview__img" id="query-image-preview-img" alt="Query image preview" hidden />
-                  <button class="button button--ghost" id="query-image-clear" type="button" hidden>Clear</button>
+            <!-- Image Preview (shown when image uploaded) -->
+            <div class="query-image-preview" id="query-image-preview-container" hidden>
+              <div class="query-image-preview__content">
+                <img class="query-image-preview__img" id="query-image-preview-img" alt="Query image" />
+                <div class="query-image-preview__info">
+                  <span class="query-image-preview__name" id="query-image-preview-name"></span>
+                  <button class="query-image-preview__remove" id="query-image-clear" type="button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
+
           </div>
 
-          <div class="field">
+          <div class="field field--span2">
             <label class="label">Search Types</label>
             <div class="checkgroup" id="search-types" aria-label="Search types">
               <label class="check">
@@ -229,7 +193,7 @@
             </div>
           </div>
 
-          <div class="field">
+          <div class="field field--span2">
             <label class="label" for="topk">Top results (K)</label>
             <input class="input" id="topk" type="number" inputmode="numeric" min="1" max="10" step="1" value="4" />
             <div class="muted" style="font-size: 12px;">Return the top K highest-ranked results (max 10).</div>
@@ -237,24 +201,16 @@
 
           <div class="field field--span2">
             <label class="label">Filter by Labels</label>
-            <div class="label-dropdown" id="label-dropdown">
-              <button class="label-dropdown__trigger" id="label-dropdown-btn" type="button"
-                aria-haspopup="true" aria-expanded="false">
-                <span id="label-dropdown-summary">No labels yet</span>
-                <svg class="label-dropdown__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                  <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-              <div class="label-dropdown__panel" id="label-dropdown-panel" hidden>
-                <div class="label-dropdown__selectall-row">
-                  <input type="checkbox" id="label-dropdown-selectall" class="label-dropdown__cb" />
-                  <label for="label-dropdown-selectall" class="label-dropdown__label label-dropdown__label--all">Select All</label>
-                </div>
-                <hr class="label-dropdown__sep" />
-                <ul class="label-dropdown__list" id="label-dropdown-list" role="list"></ul>
+            <div class="label-tags-input">
+              <div class="label-tags-list" id="label-tags-list">
+                <button class="label-tag-add" id="label-tag-add-btn" type="button" title="Add label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                </button>
               </div>
-              <div class="label-selected-chips" id="label-selected-chips" hidden></div>
             </div>
+            <div class="muted" style="font-size: 12px;">Click + to add label filters for search.</div>
           </div>
         </div>
 

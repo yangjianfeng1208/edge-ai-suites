@@ -11,8 +11,6 @@
   const fileInput = document.getElementById('upload-files');
   const fileListWrapper = document.getElementById('file-list-wrapper');
   const fileListItems = document.getElementById('file-list-items');
-  const labelsInput = document.getElementById('labels-input');
-  const btnAddToSelected = document.getElementById('btn-add-to-selected');
   const selectAllCheckbox = document.getElementById('select-all-files');
   const btnDeleteAll = document.getElementById('btn-delete-all');
   const linkClearAll = document.getElementById('link-clear-all');
@@ -105,6 +103,29 @@
     statusCell.className = 'file-item__status';
     statusCell.appendChild(createStatusDisplay(file));
 
+    // Labels cell
+    const labelsCell = document.createElement('div');
+    labelsCell.className = 'file-item__labels-cell';
+
+    // Add existing labels as tags
+    file.labels.forEach(label => {
+      labelsCell.appendChild(createInlineLabelTag(file.id, label));
+    });
+
+    // Add "+" button
+    const addLabelBtn = document.createElement('button');
+    addLabelBtn.className = 'file-item__label-add';
+    addLabelBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>`;
+    addLabelBtn.title = 'Add label';
+    addLabelBtn.type = 'button';
+    addLabelBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent triggering focus mode
+      handleAddLabel(file.id, labelsCell, addLabelBtn);
+    });
+    labelsCell.appendChild(addLabelBtn);
+
     // Elapsed Time
     const elapsedCell = document.createElement('div');
     elapsedCell.className = 'file-item__elapsed';
@@ -128,21 +149,12 @@
     row.appendChild(nameCell);
     row.appendChild(typeCell);
     row.appendChild(sizeCell);
+    row.appendChild(labelsCell);
     row.appendChild(statusCell);
     row.appendChild(elapsedCell);
     row.appendChild(actionsCell);
 
     container.appendChild(row);
-
-    // Labels row (if has labels)
-    if (file.labels.length > 0) {
-      const labelsRow = document.createElement('div');
-      labelsRow.className = 'file-item__labels';
-      file.labels.forEach(label => {
-        labelsRow.appendChild(createLabelTag(file.id, label));
-      });
-      container.appendChild(labelsRow);
-    }
 
     return container;
   }
@@ -202,7 +214,7 @@
   }
 
   /**
-   * Create label tag with remove button
+   * Create label tag with remove button (legacy - not used anymore)
    */
   function createLabelTag(fileId, label) {
     const tag = document.createElement('span');
@@ -224,6 +236,84 @@
     tag.appendChild(removeBtn);
 
     return tag;
+  }
+
+  /**
+   * Create inline label tag (for table cell)
+   */
+  function createInlineLabelTag(fileId, label) {
+    const tag = document.createElement('span');
+    tag.className = 'file-item__label-tag';
+
+    const text = document.createElement('span');
+    text.textContent = label;
+    tag.appendChild(text);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-item__label-tag-remove';
+    removeBtn.textContent = '×';
+    removeBtn.type = 'button';
+    removeBtn.title = `Remove ${label}`;
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent triggering focus mode
+      fileManager.removeLabel(fileId, label);
+      updateFileItem(fileId);
+    });
+    tag.appendChild(removeBtn);
+
+    return tag;
+  }
+
+  /**
+   * Handle adding a new label
+   */
+  function handleAddLabel(fileId, labelsCell, addBtn) {
+    // Create an editable tag
+    const tag = document.createElement('span');
+    tag.className = 'file-item__label-tag';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Label...';
+    input.style.width = '60px';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-item__label-tag-remove';
+    removeBtn.textContent = '×';
+    removeBtn.type = 'button';
+    removeBtn.title = 'Remove';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      tag.remove();
+    });
+
+    tag.appendChild(input);
+    tag.appendChild(removeBtn);
+
+    // Insert before the "+" button
+    labelsCell.insertBefore(tag, addBtn);
+
+    // Focus the input
+    input.focus();
+
+    // Handle blur - save the label
+    input.addEventListener('blur', () => {
+      const value = input.value.trim();
+      if (value) {
+        fileManager.addLabel(fileId, value);
+        updateFileItem(fileId);
+      } else {
+        tag.remove();
+      }
+    });
+
+    // Handle Enter key
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      }
+    });
   }
 
   /**
@@ -313,19 +403,35 @@
       elapsedCell.textContent = formatElapsedTime(file);
     }
 
-    // Update labels
-    const existingLabels = container.querySelector('.file-item__labels');
-    if (existingLabels) {
-      existingLabels.remove();
-    }
+    // Update labels cell
+    const labelsCell = container.querySelector('.file-item__labels-cell');
+    if (labelsCell) {
+      // Clear existing labels (but keep the "+" button)
+      const addBtn = labelsCell.querySelector('.file-item__label-add');
+      labelsCell.innerHTML = '';
 
-    if (file.labels.length > 0) {
-      const labelsRow = document.createElement('div');
-      labelsRow.className = 'file-item__labels';
+      // Re-add labels
       file.labels.forEach(label => {
-        labelsRow.appendChild(createLabelTag(file.id, label));
+        labelsCell.appendChild(createInlineLabelTag(file.id, label));
       });
-      container.appendChild(labelsRow);
+
+      // Re-add the "+" button
+      if (addBtn) {
+        labelsCell.appendChild(addBtn);
+      } else {
+        const newAddBtn = document.createElement('button');
+        newAddBtn.className = 'file-item__label-add';
+        newAddBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>`;
+        newAddBtn.title = 'Add label';
+        newAddBtn.type = 'button';
+        newAddBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleAddLabel(file.id, labelsCell, newAddBtn);
+        });
+        labelsCell.appendChild(newAddBtn);
+      }
     }
   }
 
@@ -395,17 +501,27 @@
           if (data.code === 20000) {
             const taskId = data.data?.task_id;
 
-            fileManager.updateFile(fileId, {
-              status: FILE_STATUS.QUEUED,
-              uploadedAt: new Date(),
-              taskId: taskId,
-              xhr: null,
-            });
-
-            updateFileItem(fileId);
-            setStatus(`${file.filename} uploaded successfully`);
-
-            if (taskId) {
+            // If no task_id, file already exists - mark as completed
+            if (!taskId) {
+              fileManager.updateFile(fileId, {
+                status: FILE_STATUS.COMPLETED,
+                uploadedAt: new Date(),
+                completedAt: new Date(),
+                taskId: null,
+                xhr: null,
+              });
+              updateFileItem(fileId);
+              setStatus(`${file.filename} already exists (skipped)`);
+            } else {
+              // Normal flow - start processing
+              fileManager.updateFile(fileId, {
+                status: FILE_STATUS.QUEUED,
+                uploadedAt: new Date(),
+                taskId: taskId,
+                xhr: null,
+              });
+              updateFileItem(fileId);
+              setStatus(`${file.filename} uploaded successfully`);
               startTaskPolling(fileId, taskId);
             }
           } else {
@@ -518,38 +634,6 @@
   }
 
   /**
-   * Handle add labels to selected
-   */
-  function handleAddLabelsToSelected() {
-    const input = labelsInput.value.trim();
-    if (!input) {
-      setStatus('Please enter labels');
-      return;
-    }
-
-    const labels = input.split(/[\n,]/).map(l => l.trim()).filter(l => l);
-
-    if (labels.length === 0) {
-      setStatus('Please enter valid labels');
-      return;
-    }
-
-    const checkedFiles = fileManager.getCheckedFiles();
-    if (checkedFiles.length === 0) {
-      setStatus('Please select files first');
-      return;
-    }
-
-    const updated = fileManager.addLabelsToChecked(labels);
-
-    if (updated > 0) {
-      checkedFiles.forEach(file => updateFileItem(file.id));
-      labelsInput.value = '';
-      setStatus(`Added labels to ${checkedFiles.length} file(s)`);
-    }
-  }
-
-  /**
    * Handle select all toggle
    */
   function handleSelectAllToggle() {
@@ -613,15 +697,6 @@
     }
   });
 
-  // Labels input - Enter key to add
-  labelsInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddLabelsToSelected();
-    }
-  });
-
-  btnAddToSelected.addEventListener('click', handleAddLabelsToSelected);
   selectAllCheckbox.addEventListener('change', handleSelectAllToggle);
   btnDeleteAll.addEventListener('click', handleClearAll);
   linkClearAll.addEventListener('click', handleClearAll);
