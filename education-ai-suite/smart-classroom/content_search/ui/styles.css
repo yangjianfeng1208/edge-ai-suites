@@ -245,9 +245,7 @@ body {
 }
 
 .card--search .status {
-  flex-shrink: 0;
-  margin-bottom: 16px;
-  min-height: 24px; /* Reserve space even when empty */
+  display: none; /* Hide status messages */
 }
 
 .card--search .search-input-area,
@@ -1179,29 +1177,30 @@ body {
   flex-shrink: 0;
 }
 
-/* Hide header when no results, but keep container visible for layout stability */
-.card--search .results-container[data-empty="true"] .results-container__header {
+/* Hide only the meta text when no results, keep type selector visible */
+.card--search .results-container[data-empty="true"] .results__meta {
   display: none;
 }
 
 .results-container__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
+  min-height: 40px;
 }
 
 .results__meta {
-  flex: 1;
   color: #6b7280;
   font-size: 13px;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .results__controls {
+  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -1312,27 +1311,30 @@ body {
 /* Score badge */
 .result-card__score {
   font-size: 11px;
-  font-weight: 650;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 .result-card__score--high {
-  background: color-mix(in srgb, MediumSeaGreen 15%, var(--surface));
-  border-color: color-mix(in srgb, MediumSeaGreen 40%, var(--border));
-  color: color-mix(in srgb, MediumSeaGreen 80%, CanvasText);
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
 }
 .result-card__score--mid {
-  background: color-mix(in srgb, DarkOrange 15%, var(--surface));
-  border-color: color-mix(in srgb, DarkOrange 40%, var(--border));
-  color: color-mix(in srgb, DarkOrange 80%, CanvasText);
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #d97706;
 }
 .result-card__score--low {
-  background: color-mix(in srgb, Crimson 15%, var(--surface));
-  border-color: color-mix(in srgb, Crimson 40%, var(--border));
-  color: color-mix(in srgb, Crimson 80%, CanvasText);
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #dc2626;
 }
 
 /* Metadata row */
@@ -3080,6 +3082,7 @@ body {
   font-size: 12px;
   color: var(--muted);
   flex-shrink: 0;
+  min-width: 150px;
 }
 
 .result-card__details li {

@@ -265,6 +265,14 @@ function openPreviewModal(result) {
           </div>`;
         }
 
+        // Show summary text if available
+        if (result.summary) {
+          content += `<div class="preview-context">
+            <div class="preview-context__label">Scene Summary:</div>
+            <div class="preview-context__text">${result.summary}</div>
+          </div>`;
+        }
+
         content += `<video class="preview-video" controls autoplay>
           <source src="${videoSrc}#t=${startTime}" type="video/mp4">
           Your browser does not support the video tag.
