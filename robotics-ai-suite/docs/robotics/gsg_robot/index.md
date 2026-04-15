@@ -577,13 +577,7 @@ access to commonly used robotic functionality with ease.
    echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | sudo tee /etc/apt/sources.list.d/librealsense.list
    ```
 
-3. Update your APT repository caches after setting up the repository:
-
-   ```bash
-   sudo apt update
-   ```
-
-4. Configure APT preferences to pin the RealSense version:
+3. Configure APT preferences to pin the RealSense version:
 
    This step pins the RealSense SDK to validated versions that ensure compatibility with ROS 2 and the tutorials in this documentation. This prevents automatic upgrades during ``apt upgrade`` that could introduce compatibility issues.
 
@@ -610,12 +604,36 @@ access to commonly used robotic functionality with ease.
    ::::
    :::::
 
-5. Install the RealSense drivers and libraries:
+4. Update your APT repository caches after setting up the repository:
 
    ```bash
+   sudo apt update
+   ```
+
+5. Install the RealSense drivers and libraries:
+
+   :::::{tab-set}
+   ::::{tab-item} **Jazzy**
+   :sync: jazzy
+
+   ```bash
+   sudo apt-get install -y --allow-downgrades ros-jazzy-librealsense2
    sudo apt install librealsense2-dkms
    sudo apt install librealsense2
    ```
+
+   ::::
+   ::::{tab-item} **Humble**
+   :sync: humble
+
+   ```bash
+   sudo apt-get install -y --allow-downgrades ros-humble-librealsense2
+   sudo apt install librealsense2-dkms
+   sudo apt install librealsense2
+   ```
+
+   ::::
+   :::::
 
    > **Note:** The pinned version ensures stability across tutorials. To upgrade in the future, update the version in `/etc/apt/preferences.d/librealsense` before installing.
 
