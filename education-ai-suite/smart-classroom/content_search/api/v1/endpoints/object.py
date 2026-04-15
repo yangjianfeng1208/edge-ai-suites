@@ -3,14 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import urllib.parse
 import mimetypes
 import json
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, BackgroundTasks, Form, Request
-from fastapi.responses import StreamingResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, BackgroundTasks, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import re
 from utils.database import get_db
 from utils.task_service import task_service
 from utils.storage_service import storage_service
@@ -128,92 +126,26 @@ async def file_search(payload: dict, db: Session = Depends(get_db)):
     return resp_200(data=result, message="Search completed")
 
 @router.get("/download")
-async def download_file(request: Request, file_key: str, inline: bool = False):
+async def download_file(file_key: str):
     """
-    Download or preview a file with HTTP Range support for video streaming
-    e.g:
-      - GET /download?file_key=runs/run_xxx/raw/video/default/test.mp4  (download)
-      - GET /download?file_key=runs/run_xxx/raw/video/default/test.mp4&inline=true  (preview with range support)
+    e.g: GET /download?file_key=runs/run_xxx/raw/video/default/test.mp4
+    Uses FileResponse to support HTTP Range requests (206 Partial Content),
+    enabling efficient video seeking and thumbnail generation in the browser.
     """
+    disk_path = storage_service.get_file_disk_path(file_key)
+    if not disk_path or not disk_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
     filename = file_key.split('/')[-1]
     content_type, _ = mimetypes.guess_type(filename)
     if not content_type:
         content_type = "application/octet-stream"
 
-    encoded_filename = urllib.parse.quote(filename)
-    disposition_type = "inline" if inline else "attachment"
-
-    # Get file size
-    try:
-        file_size = storage_service.get_file_size(file_key)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
-
-    # Parse Range header
-    range_header = request.headers.get("range")
-
-    if range_header:
-        # Parse range like "bytes=0-1023" or "bytes=1024-"
-        range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
-        if not range_match:
-            raise HTTPException(status_code=416, detail="Invalid range")
-
-        start = int(range_match.group(1))
-        end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
-
-        # Validate range
-        if start >= file_size or end >= file_size or start > end:
-            raise HTTPException(status_code=416, detail="Range not satisfiable")
-
-        content_length = end - start + 1
-
-        # Read the range from file
-        file_stream = await storage_service.get_file_stream(file_key)
-        file_stream.seek(start)
-
-        def iter_range():
-            remaining = content_length
-            chunk_size = 8192
-            try:
-                while remaining > 0:
-                    chunk = file_stream.read(min(chunk_size, remaining))
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
-                    yield chunk
-            finally:
-                file_stream.close()
-
-        headers = {
-            "Content-Range": f"bytes {start}-{end}/{file_size}",
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(content_length),
-            "Content-Disposition": f"{disposition_type}; filename=\"{encoded_filename}\"; filename*=UTF-8''{encoded_filename}",
-            "Access-Control-Expose-Headers": "Content-Disposition, Content-Range, Accept-Ranges"
-        }
-
-        return StreamingResponse(
-            iter_range(),
-            status_code=206,
-            media_type=content_type,
-            headers=headers
-        )
-    else:
-        # No range requested, return full file
-        file_stream = await storage_service.get_file_stream(file_key)
-
-        headers = {
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(file_size),
-            "Content-Disposition": f"{disposition_type}; filename=\"{encoded_filename}\"; filename*=UTF-8''{encoded_filename}",
-            "Access-Control-Expose-Headers": "Content-Disposition, Accept-Ranges"
-        }
-
-        return StreamingResponse(
-            file_stream,
-            media_type=content_type,
-            headers=headers
-        )
+    return FileResponse(
+        path=str(disk_path),
+        media_type=content_type,
+        filename=filename
+    )
 
 @router.delete("/cleanup-task/{task_id}")
 async def delete_specific_task(

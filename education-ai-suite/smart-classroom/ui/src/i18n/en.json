@@ -242,6 +242,8 @@
     "videos": "Videos",
     "selectAtLeastOneType": "Please select at least one type",
     "filterByLabel": "Filter by labels",
+    "enterLabel": "Enter label...",
+    "addLabel": "Add label",
     "topResults": "Top Results:",
     "searching": "Searching...",
     "search": "Search",

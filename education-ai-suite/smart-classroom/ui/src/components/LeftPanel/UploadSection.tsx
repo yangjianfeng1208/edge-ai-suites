@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import "../../assets/css/UploadSection.css";
 import { csUploadIngest, csQueryTask, csIngest, csCleanupTask, createSession, startMonitoring } from "../../services/api";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
-import { setCsProcessing, setSessionId, setMonitoringActive, setCsUploadsComplete, setCsHasUploads } from "../../redux/slices/uiSlice";
+import { setCsProcessing, setSessionId, setMonitoringActive, setCsUploadsComplete, setCsHasUploads, addCsAvailableLabels } from "../../redux/slices/uiSlice";
 
 type TaskStatus =
   | "STAGED"
@@ -122,6 +122,7 @@ const UploadSection: React.FC = () => {
         return updated;
       })
     );
+    dispatch(addCsAvailableLabels([tag]));
     setTagInput("");
   };
 
@@ -342,8 +343,8 @@ const UploadSection: React.FC = () => {
     });
     setConfirmRemoveId(null);
 
-    // Call backend cleanup if the file was uploaded (has a taskId)
-    if (removedEntry?.taskId) {
+    // Call backend cleanup if the file was uploaded (has a valid taskId)
+    if (removedEntry?.taskId?.trim()) {
       csCleanupTask(removedEntry.taskId).catch((err) =>
         console.warn(`Cleanup failed for task ${removedEntry!.taskId}:`, err)
       );

@@ -243,6 +243,8 @@
     "videos": "视频",
     "selectAtLeastOneType": "请至少选择一种类型",
     "filterByLabel": "按标签筛选",
+    "enterLabel": "输入标签...",
+    "addLabel": "添加标签",
     "topResults": "最佳结果：",
     "searching": "正在搜索...",
     "search": "搜索",

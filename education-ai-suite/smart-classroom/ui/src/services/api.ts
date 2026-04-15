@@ -1042,6 +1042,17 @@ export async function searchContent(sessionId: string, query: string, topK: numb
   });
 }
 
+// Content Search helpers
+export function csDownloadUrl(fileKey: string): string {
+  return `${CONTENT_SEARCH_API_URL}/api/v1/object/download?file_key=${encodeURIComponent(fileKey)}`;
+}
+
+export function extractFileKey(filePath: string): string | null {
+  if (!filePath) return null;
+  // Remove protocol and bucket prefix: "local://content-search/runs/..." -> "runs/..."
+  return filePath.replace(/^[a-z]+:\/\/[^/]+\//, '');
+}
+
 // Content Search API - search for objects
 export async function csSearch(params: CsSearchParams): Promise<CsSearchResult[]> {
   try {
@@ -1058,8 +1069,10 @@ export async function csSearch(params: CsSearchParams): Promise<CsSearchResult[]
       throw new Error(`Content search failed: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    const json = await response.json();
+    // Backend wraps response as { code: 20000, data: { results: [...] }, message: "..." }
+    const results = json?.data?.results;
+    return Array.isArray(results) ? results : [];
   } catch (error) {
     console.error('csSearch error:', error);
     return [];

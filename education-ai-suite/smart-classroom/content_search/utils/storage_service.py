@@ -55,6 +55,11 @@ class StorageService:
             "run_id": run_id
         }
 
+    def get_file_disk_path(self, file_key: str):
+        if not self.is_available:
+            raise RuntimeError(f"Storage Service is unavailable: {self._error_msg}")
+        return self._store._object_path(file_key)
+
     async def get_file_stream(self, file_key: str):
         if not self.is_available:
             raise RuntimeError(f"Storage Service unavailable: {self._error_msg}")

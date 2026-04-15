@@ -73,6 +73,7 @@ export interface UIState {
   transcriptionDone: boolean;
   csUploadsComplete: boolean;
   csHasUploads: boolean;
+  csAvailableLabels: string[];
 }
  
 const initialState: UIState = {
@@ -130,6 +131,7 @@ const initialState: UIState = {
   csProcessing: false,
   csUploadsComplete: false,
   csHasUploads: false,
+  csAvailableLabels: [],
 };
 
 const uiSlice = createSlice({
@@ -510,6 +512,14 @@ const uiSlice = createSlice({
       state.csHasUploads = action.payload;
     },
 
+    addCsAvailableLabels(state, action: PayloadAction<string[]>) {
+      const existing = new Set(state.csAvailableLabels);
+      for (const label of action.payload) {
+        if (label.trim()) existing.add(label.trim());
+      }
+      state.csAvailableLabels = Array.from(existing);
+    },
+
     clearSearchResults(state) {
       state.searchResults = [];
       state.showSearchResults = false;
@@ -598,6 +608,7 @@ export const {
   setCsProcessing,
   setCsUploadsComplete,
   setCsHasUploads,
+  addCsAvailableLabels,
 } = uiSlice.actions;
  
 export default uiSlice.reducer;

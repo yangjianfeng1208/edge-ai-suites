@@ -11,11 +11,10 @@ import { useAppSelector } from "../../redux/hooks";
 type SearchTab = "text" | "image";
 type SearchType = "document" | "image" | "video";
 
-const AVAILABLE_LABELS = ["class", "student", "lecture", "exam", "default", "default_video"];
 const MAX_QUERY_LENGTH = 100;
 const DEFAULT_MAX_RESULTS = 10;
 
-const ALLOWED_IMAGE_EXTENSIONS = new Set([".png"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg"]);
 
 function isAllowedImage(filename: string): boolean {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
@@ -39,8 +38,9 @@ const SearchSection: React.FC = () => {
   const { t } = useTranslation();
   const csUploadsComplete = useAppSelector((s) => s.ui.csUploadsComplete);
   const csHasUploads = useAppSelector((s) => s.ui.csHasUploads);
+  const csAvailableLabels = useAppSelector((s) => s.ui.csAvailableLabels);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const filterBoxRef = useRef<HTMLDivElement>(null);
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<SearchTab>("text");
 
@@ -55,23 +55,7 @@ const SearchSection: React.FC = () => {
   );
 
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (filterBoxRef.current && !filterBoxRef.current.contains(event.target as Node)) {
-        setIsLabelDropdownOpen(false);
-      }
-    };
-
-    if (isLabelDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isLabelDropdownOpen]);
+  const [labelInput, setLabelInput] = useState("");
 
   // Reset search when all uploads are cleared
   useEffect(() => {
@@ -84,6 +68,7 @@ const SearchSection: React.FC = () => {
       setImagePreview(null);
       setSelectedTypes(new Set(["document", "image", "video"]));
       setSelectedLabels([]);
+      setLabelInput("");
       setMaxResults(DEFAULT_MAX_RESULTS);
       setSearchResults([]);
       setShowResults(false);
@@ -132,14 +117,13 @@ const SearchSection: React.FC = () => {
     });
   }, []);
 
-  const toggleLabel = useCallback((label: string) => {
-    setSelectedLabels((prev) => {
-      if (prev.includes(label)) {
-        return prev.filter((l) => l !== label);
-      }
-      return [...prev, label];
-    });
-  }, []);
+  const addLabel = useCallback(() => {
+    const value = labelInput.trim();
+    if (value && !selectedLabels.includes(value)) {
+      setSelectedLabels((prev) => [...prev, value]);
+    }
+    setLabelInput("");
+  }, [labelInput, selectedLabels]);
 
   const removeLabel = useCallback((label: string) => {
     setSelectedLabels((prev) => prev.filter((l) => l !== label));
@@ -232,6 +216,7 @@ const SearchSection: React.FC = () => {
     clearImage();
     setSelectedTypes(new Set(["document", "image", "video"]));
     setSelectedLabels([]);
+    setLabelInput("");
     setMaxResults(DEFAULT_MAX_RESULTS);
     setSearchResults([]);
     setShowResults(false);
@@ -343,7 +328,7 @@ const SearchSection: React.FC = () => {
                 <input
                   ref={imageInputRef}
                   type="file"
-                  accept=".jpg"
+                  accept=".png,.jpg,.jpeg"
                   style={{ display: "none" }}
                   onChange={handleImageChange}
                 />
@@ -395,46 +380,80 @@ const SearchSection: React.FC = () => {
             <div className="cs-search-divider" />
 
             {/* Filter by Label */}
-            {/*<div className={`cs-search-filter-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>
+            <div className={`cs-search-filter-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>
               <div className="cs-search-filter-label">{t("searchSection.filterByLabel")}</div>
-              <div 
-                ref={filterBoxRef}
-                className="cs-search-filter-box"
-                onClick={() => hasSelectedType && hasValidInput && setIsLabelDropdownOpen(!isLabelDropdownOpen)}
-              >
-                <div className="cs-search-filter-chips">
-                  {selectedLabels.map((label) => (
-                    <span key={label} className="cs-search-chip">
-                      {label}
+              <div className="cs-search-label-tags-list">
+                {selectedLabels.map((label) => (
+                  <div key={label} className="cs-search-label-tag">
+                    <span className="cs-search-label-tag__text">{label}</span>
+                    <button
+                      className="cs-search-label-tag__remove"
+                      onClick={() => removeLabel(label)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                <div className="cs-search-label-tag-input-wrap">
+                  <input
+                    ref={labelInputRef}
+                    className="cs-search-label-tag__input"
+                    type="text"
+                    placeholder={t("searchSection.enterLabel", "Enter label...")}
+                    value={labelInput}
+                    onChange={(e) => setLabelInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLabel();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (labelInput.trim()) addLabel();
+                    }}
+                    disabled={!hasSelectedType || !hasValidInput}
+                  />
+                  <button
+                    className="cs-search-label-tag-add"
+                    type="button"
+                    title={t("searchSection.addLabel", "Add label")}
+                    onClick={() => {
+                      addLabel();
+                      labelInputRef.current?.focus();
+                    }}
+                    disabled={!hasSelectedType || !hasValidInput || !labelInput.trim()}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {/* Available label suggestions */}
+              {csAvailableLabels.length > 0 && (
+                <div className="cs-search-label-suggestions">
+                  {csAvailableLabels
+                    .filter((l) => !selectedLabels.includes(l))
+                    .map((label) => (
                       <button
-                        className="cs-search-chip-remove"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeLabel(label);
+                        key={label}
+                        className="cs-search-label-suggestion"
+                        type="button"
+                        onClick={() => {
+                          if (!selectedLabels.includes(label)) {
+                            setSelectedLabels((prev) => [...prev, label]);
+                          }
                         }}
                         disabled={!hasSelectedType || !hasValidInput}
                       >
-                        ✕
+                        + {label}
                       </button>
-                    </span>
-                  ))}
-                </div>
-                {isLabelDropdownOpen && hasSelectedType && hasValidInput && (
-                  <div className="cs-search-filter-dropdown" onClick={(e) => e.stopPropagation()}>
-                    {AVAILABLE_LABELS.map((label) => (
-                      <label key={label} className="cs-search-filter-dropdown-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedLabels.includes(label)}
-                          onChange={() => toggleLabel(label)}
-                        />
-                        <span>{label}</span>
-                      </label>
                     ))}
-                  </div>
-                )}
-              </div>
-            </div> */}
+                </div>
+              )}
+            </div>
 
             {/* Top Results */}
             <div className={`cs-search-results-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>
