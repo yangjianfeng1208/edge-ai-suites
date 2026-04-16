@@ -13,9 +13,10 @@ interface TopPanelProps {
   setIsSettingsOpen: (isOpen: boolean) => void;
   activeScreen: 'main' | 'content-search';
   setActiveScreen: (screen: 'main' | 'content-search') => void;
+  mainBackendAvailable: boolean;
 }
 
-const TopPanel: React.FC<TopPanelProps> = ({ projectName, setProjectName, isSettingsOpen, setIsSettingsOpen, activeScreen, setActiveScreen }) => {
+const TopPanel: React.FC<TopPanelProps> = ({ projectName, setProjectName, isSettingsOpen, setIsSettingsOpen, activeScreen, setActiveScreen, mainBackendAvailable }) => {
   const menuIconRef = useRef<HTMLImageElement>(null);
   const { t } = useTranslation();
 
@@ -35,12 +36,14 @@ const TopPanel: React.FC<TopPanelProps> = ({ projectName, setProjectName, isSett
           <span className="app-title">{t('contentSearch.title', 'Content Search')}</span>
         </div>
         <div className="action-slot">
-          <button
-            className="content-search-back-btn"
-            onClick={() => setActiveScreen('main')}
-          >
-            {t('contentSearch.back', '← Back')}
-          </button>
+          {mainBackendAvailable && (
+            <button
+              className="content-search-back-btn"
+              onClick={() => setActiveScreen('main')}
+            >
+              {t('contentSearch.back', '← Back')}
+            </button>
+          )}
           <LanguageSwitcher />
         </div>
       </header>

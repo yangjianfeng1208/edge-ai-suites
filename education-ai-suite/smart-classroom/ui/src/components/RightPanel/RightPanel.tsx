@@ -12,7 +12,7 @@ interface RightPanelProps {
 const RightPanel: React.FC<RightPanelProps> = ({ activeScreen }) => {
   return (
     <div className="right-panel">
-      <ConfigurationMetricsAccordion />
+      <ConfigurationMetricsAccordion activeScreen={activeScreen} />
       <ResourceUtilizationAccordion activeScreen={activeScreen} />
       <div style={{ display: activeScreen === 'main' ? 'contents' : 'none' }}>
         <ClassStatisticsAccordion />

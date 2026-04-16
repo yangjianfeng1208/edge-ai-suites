@@ -1,9 +1,9 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import "../../assets/css/UploadSection.css";
-import { csUploadIngest, csQueryTask, csIngest, csCleanupTask, createSession, startMonitoring } from "../../services/api";
+import { csUploadIngest, csQueryTask, csIngest, csCleanupTask, csCheckHasData, createSession, startMonitoring } from "../../services/api";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
-import { setCsProcessing, setSessionId, setMonitoringActive, setCsUploadsComplete, setCsHasUploads, setCsTags } from "../../redux/slices/uiSlice";
+import { setCsProcessing, setSessionId, setMonitoringActive, setCsUploadsComplete, setCsHasUploads, setCsDbHasData, addCsAvailableLabels } from "../../redux/slices/uiSlice";
 
 type TaskStatus =
   | "STAGED"
@@ -12,6 +12,8 @@ type TaskStatus =
   | "COMPLETED"
   | "FAILED"
   | "ALREADY_EXISTS";
+
+type VideoSummaryStatus = "PROCESSING" | "COMPLETED" | "FAILED" | null;
 
 interface UploadEntry {
   id: string;
@@ -26,6 +28,9 @@ interface UploadEntry {
   error: string | null;
   selected: boolean;
   tags: string[];
+  videoSummaryStatus: VideoSummaryStatus;
+  isVideo: boolean;
+  vsEnabled: boolean;
 }
 
 const POLL_INTERVAL_MS = 3000;
@@ -41,9 +46,16 @@ function formatSize(bytes: number): string {
 }
 
 const ALLOWED_EXTENSIONS = new Set([".mp4", ".ppt", ".pptx", ".docx", ".pdf", ".jpg", ".jpeg", ".csv", ".txt"]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".avi", ".mov", ".mkv"]);
+
 function isAllowed(filename: string): boolean {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
   return ALLOWED_EXTENSIONS.has(ext);
+}
+
+function isVideoFile(filename: string): boolean {
+  const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  return VIDEO_EXTENSIONS.has(ext);
 }
 
 const TERMINAL: TaskStatus[] = ["COMPLETED", "FAILED", "ALREADY_EXISTS"];
@@ -65,8 +77,9 @@ const UploadSection: React.FC = () => {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const allSelected = entries.length > 0 && entries.every((e) => e.selected);
-  const someSelected = entries.some((e) => e.selected);
+  const stagedEntries = entries.filter((e) => e.status === "STAGED");
+  const allSelected = stagedEntries.length > 0 && stagedEntries.every((e) => e.selected);
+  const someSelected = stagedEntries.some((e) => e.selected);
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -80,27 +93,29 @@ const UploadSection: React.FC = () => {
   useEffect(() => {
     if (entries.length > 0) {
       dispatch(setCsHasUploads(true));
-      const anyUploaded = entries.some(
-        (e) => e.status === "COMPLETED" || e.status === "ALREADY_EXISTS"
+      const completedEntries = entries.filter(
+        (e) => e.status === "COMPLETED"
       );
-      dispatch(setCsUploadsComplete(anyUploaded));
+      if (completedEntries.length > 0 || entries.some((e) => e.status === "ALREADY_EXISTS")) {
+        dispatch(setCsUploadsComplete(true));
+        dispatch(setCsDbHasData(true));
+      }
+      // Only add labels to filter when files are successfully uploaded (COMPLETED)
+      const completedLabels = completedEntries.flatMap((e) => e.tags);
+      if (completedLabels.length > 0) {
+        dispatch(addCsAvailableLabels(completedLabels));
+      }
     }
-  }, [entries, dispatch]);
-
-  useEffect(() => {
-    const allTags = entries.flatMap((e) => e.tags);
-    const uniqueTags = [...new Set(allTags)];
-    dispatch(setCsTags(uniqueTags));
   }, [entries, dispatch]);
 
   const toggleSelectAll = () => {
     const next = !allSelected;
-    setEntries((prev) => prev.map((e) => ({ ...e, selected: next })));
+    setEntries((prev) => prev.map((e) => e.status === "STAGED" ? { ...e, selected: next } : e));
   };
 
   const toggleSelect = (id: string) => {
     setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e))
+      prev.map((e) => (e.id === id && e.status === "STAGED" ? { ...e, selected: !e.selected } : e))
     );
   };
 
@@ -109,23 +124,20 @@ const UploadSection: React.FC = () => {
 
   const selectedEntries = entries.filter((e) => e.selected);
 
-  // Add a chip tag on Enter or comma — available whenever a file is selected
-  const handleTagKeyDown = (ev: React.KeyboardEvent<HTMLInputElement>) => {
-    if (ev.key !== "Enter" && ev.key !== ",") return;
-    ev.preventDefault();
-    const tag = tagInput.trim().replace(/,$/, "");
-    if (!tag) return;
+  // Parse input text into unique tags (one label per line)
+  const parseTags = (text: string): string[] =>
+    [...new Set(text.split(/\n/).map((s) => s.trim()).filter(Boolean))];
 
-    // Update tags locally; re-stage any completed files so Upload button picks them up
+  // "Add to selected" — parse input and apply to selected (STAGED only) files
+  const applyTagsToSelected = () => {
+    const tags = parseTags(tagInput);
+    if (tags.length === 0 || selectedEntries.length === 0) return;
     setEntries((prev) =>
       prev.map((e) => {
-        if (!e.selected || e.tags.includes(tag)) return e;
-        const updated = { ...e, tags: [...e.tags, tag] };
-        // If already uploaded, move back to STAGED so user confirms re-ingest via Upload button
-        if (e.status === "COMPLETED" || e.status === "ALREADY_EXISTS") {
-          updated.status = "STAGED";
-        }
-        return updated;
+        if (!e.selected || e.status !== "STAGED") return e;
+        const newTags = tags.filter((t) => !e.tags.includes(t));
+        if (newTags.length === 0) return e;
+        return { ...e, tags: [...e.tags, ...newTags] };
       })
     );
     setTagInput("");
@@ -134,13 +146,8 @@ const UploadSection: React.FC = () => {
   const removeTag = (entryId: string, tag: string) => {
     setEntries((prev) =>
       prev.map((e) => {
-        if (e.id !== entryId) return e;
-        const updated = { ...e, tags: e.tags.filter((t) => t !== tag) };
-        // Re-stage if already uploaded so the Upload button triggers re-ingest
-        if (e.status === "COMPLETED" || e.status === "ALREADY_EXISTS") {
-          updated.status = "STAGED";
-        }
-        return updated;
+        if (e.id !== entryId || e.status !== "STAGED") return e;
+        return { ...e, tags: e.tags.filter((t) => t !== tag) };
       })
     );
   };
@@ -179,9 +186,14 @@ const UploadSection: React.FC = () => {
             (result.result?.file_info as any)?.file_key ??
             (result.result as any)?.file_key ??
             null;
-          updateEntry(entryId, { status, progress, ...(fileKey ? { fileKey } : {}) });
 
-          if (status === "COMPLETED" || status === "FAILED") {
+          const vss = (result.result as any)?.video_summary_status as VideoSummaryStatus ?? null;
+          updateEntry(entryId, { status, progress, videoSummaryStatus: vss, ...(fileKey ? { fileKey } : {}) });
+
+          // Stop polling when task is terminal AND no video summary is still processing
+          const isTerminal = status === "COMPLETED" || status === "FAILED";
+          const summaryDone = vss !== "PROCESSING";
+          if (isTerminal && summaryDone) {
             clearInterval(pollTimers.current[entryId]);
             delete pollTimers.current[entryId];
           }
@@ -198,35 +210,57 @@ const UploadSection: React.FC = () => {
   // Stage files locally — upload is triggered explicitly by the user
   const processFiles = useCallback(
     (files: File[]) => {
-      const newEntries: UploadEntry[] = files.map((f) => ({
-        id: genId(),
-        file: f,
-        filename: f.name,
-        fileType: f.name.split(".").pop()?.toUpperCase() ?? "—",
-        fileSize: f.size,
-        taskId: null,
-        fileKey: null,
-        status: "STAGED" as TaskStatus,
-        progress: 0,
-        error: null,
-        selected: false,
-        tags: [],
-      }));
-      setEntries((prev) => [...prev, ...newEntries]);
+      setEntries((prev) => {
+        // Deduplicate by filename + size against existing entries
+        const existingKeys = new Set(prev.map((e) => `${e.filename}|${e.fileSize}`));
+        const unique = files.filter((f) => !existingKeys.has(`${f.name}|${f.size}`));
+        if (unique.length === 0) return prev;
+
+        const newEntries: UploadEntry[] = unique.map((f) => ({
+          id: genId(),
+          file: f,
+          filename: f.name,
+          fileType: f.name.split(".").pop()?.toUpperCase() ?? "—",
+          fileSize: f.size,
+          taskId: null,
+          fileKey: null,
+          status: "STAGED" as TaskStatus,
+          progress: 0,
+          error: null,
+          selected: false,
+          tags: [],
+          videoSummaryStatus: null,
+          isVideo: isVideoFile(f.name),
+          vsEnabled: true,
+        }));
+        return [...prev, ...newEntries];
+      });
     },
     []
   );
 
   // Upload all staged files (with their tags) when user clicks the Upload button
   const handleUploadAll = useCallback(async () => {
-    // Read staged entries directly from current state
-    const stagedEntries = entries.filter((e) => e.status === "STAGED");
+    // Auto-apply any pending labels from the input before uploading
+    const pendingTags = parseTags(tagInput);
+    let entriesToUpload = entries;
+    if (pendingTags.length > 0) {
+      entriesToUpload = entries.map((e) => {
+        if (!e.selected || e.status !== "STAGED") return e;
+        const newTags = pendingTags.filter((t) => !e.tags.includes(t));
+        if (newTags.length === 0) return e;
+        return { ...e, tags: [...e.tags, ...newTags] };
+      });
+      setTagInput("");
+    }
+
+    const stagedEntries = entriesToUpload.filter((e) => e.status === "STAGED");
     if (!stagedEntries.length) return;
 
-    // Mark all staged entries as PROCESSING upfront
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.status === "STAGED" ? { ...e, status: "PROCESSING" as TaskStatus } : e
+    // Update entries state with any auto-applied tags, mark as PROCESSING
+    setEntries(
+      entriesToUpload.map((e) =>
+        e.status === "STAGED" ? { ...e, status: "PROCESSING" as TaskStatus, selected: false } : e
       )
     );
 
@@ -255,18 +289,20 @@ const UploadSection: React.FC = () => {
     await Promise.all(
       stagedEntries.map(async (entry) => {
         try {
-          const meta = entry.tags.length ? { tags: entry.tags } : undefined;
+          const meta: Record<string, unknown> = {};
+          if (entry.tags.length) meta.tags = entry.tags;
+          if (entry.isVideo) meta.vs_enabled = entry.vsEnabled;
           // If file already exists on server (re-staged with new tags), re-ingest with updated tags
           // Otherwise do a fresh upload+ingest
           if (entry.fileKey) {
-            const ingestRes = await csIngest(entry.fileKey, meta ?? {});
+            const ingestRes = await csIngest(entry.fileKey, meta);
             updateEntry(entry.id, { taskId: ingestRes.task_id, status: "PROCESSING", fileKey: entry.fileKey });
             startPolling(entry.id, ingestRes.task_id);
           } else {
-            const res = await csUploadIngest(entry.file, meta);
+            const res = await csUploadIngest(entry.file, Object.keys(meta).length ? meta : undefined);
             if (res.status === "ALREADY_EXISTS") {
-              // File was already fully processed — store task_id so cleanup works on remove
-              updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100, taskId: res.task_id || null });
+              // File was already fully processed in a previous session — no new task created
+              updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100 });
             } else {
               updateEntry(entry.id, { taskId: res.task_id, status: "PROCESSING", fileKey: res.file_key ?? null });
               startPolling(entry.id, res.task_id);
@@ -280,17 +316,19 @@ const UploadSection: React.FC = () => {
         }
       })
     );
-  }, [entries, updateEntry, startPolling, dispatch]);
+  }, [entries, tagInput, updateEntry, startPolling, dispatch]);
 
   const handleRetry = useCallback(
     async (entry: UploadEntry) => {
       updateEntry(entry.id, { status: "PROCESSING", progress: 0, error: null, taskId: null });
       try {
-        const meta = entry.tags.length ? { tags: entry.tags } : undefined;
-        const res = await csUploadIngest(entry.file, meta);
+        const meta: Record<string, unknown> = {};
+        if (entry.tags.length) meta.tags = entry.tags;
+        if (entry.isVideo) meta.vs_enabled = entry.vsEnabled;
+        const res = await csUploadIngest(entry.file, Object.keys(meta).length ? meta : undefined);
         if (res.status === "ALREADY_EXISTS") {
-          // Already fully processed — store task_id so cleanup works on remove
-          updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100, taskId: res.task_id || null });
+          // Already fully processed — no new background task, treat as terminal
+          updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100 });
         } else {
           updateEntry(entry.id, { taskId: res.task_id, status: "PROCESSING", fileKey: res.file_key ?? null });
           startPolling(entry.id, res.task_id);
@@ -341,15 +379,23 @@ const UploadSection: React.FC = () => {
     setEntries((prev) => {
       const next = prev.filter((e) => e.id !== id);
       if (next.length === 0) {
-        dispatch(setCsHasUploads(false));
-        dispatch(setCsUploadsComplete(false));
+        // Last file removed — re-check if backend DB still has data
+        csCheckHasData().then((hasData) => {
+          dispatch(setCsDbHasData(hasData));
+          dispatch(setCsHasUploads(hasData));
+          dispatch(setCsUploadsComplete(hasData));
+        }).catch(() => {
+          dispatch(setCsDbHasData(false));
+          dispatch(setCsHasUploads(false));
+          dispatch(setCsUploadsComplete(false));
+        });
       }
       return next;
     });
     setConfirmRemoveId(null);
 
-    // Call backend cleanup if the file was uploaded (has a taskId)
-    if (removedEntry?.taskId) {
+    // Call backend cleanup if the file was uploaded (has a valid taskId)
+    if (removedEntry?.taskId?.trim()) {
       csCleanupTask(removedEntry.taskId).catch((err) =>
         console.warn(`Cleanup failed for task ${removedEntry!.taskId}:`, err)
       );
@@ -366,9 +412,6 @@ const UploadSection: React.FC = () => {
       case "ALREADY_EXISTS": return t("uploadSection.alreadyExists");
     }
   };
-
-  // Tags can be added to any selected file, even before upload
-  const canAddTags = selectedEntries.length > 0;
 
 return (
   <>
@@ -390,6 +433,7 @@ return (
       </div>
 
       <p className="cs-supported-types">{t("uploadSection.supportedTypes")}</p>
+      <p className="cs-max-size-hint">{t("uploadSection.maxTotalSize", "Max total size: 500 MB")}</p>
 
       <input
         ref={fileInputRef}
@@ -400,54 +444,31 @@ return (
         onChange={handleFileChange}
       />
 
-      {/* ── Tag Editor ── */}
-      {entries.length > 0 && (
-        <div className="cs-meta-panel">
-          {selectedEntries.length === 0 ? (
-            <p className="cs-meta-hint">{t("uploadSection.selectFileToAddTags")}</p>
-          ) : (
-            <>
-              <p className="cs-meta-title">
-                {selectedEntries.length === 1
-                  ? `Tags for: ${selectedEntries[0].filename}`
-                  : `Tags for ${selectedEntries.length} selected files`}
-              </p>
-
-              {/* Chips per selected entry */}
-              {selectedEntries.map((se) =>
-                se.tags.length > 0 ? (
-                  <div key={se.id} className="cs-chip-row">
-                    {selectedEntries.length > 1 && (
-                      <span className="cs-chip-file-label">{se.filename}:</span>
-                    )}
-                    {se.tags.map((tag) => (
-                      <span key={tag} className="cs-chip">
-                        {tag}
-                        <button
-                          className="cs-chip-remove"
-                          onClick={() => removeTag(se.id, tag)}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : null
-              )}
-
-              <div className="cs-meta-row">
-                <input
-                  type="text"
-                  className="cs-meta-input cs-meta-input--tags"
-                  placeholder="Add tag — press Enter or comma"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                />
-              </div>
-            </>
-          )}
-        </div>
+      {/* ── Labels: hint when no files selected, editor when files selected ── */}
+      {stagedEntries.length > 0 && (
+        selectedEntries.length > 0 ? (
+          <div className="cs-labels-panel">
+            <div className="cs-labels-title">{t("uploadSection.labelsTitle", "Labels")}</div>
+            <div className="cs-labels-input-row">
+              <textarea
+                className="cs-labels-input cs-labels-textarea"
+                placeholder={t("uploadSection.enterTagsPlaceholder", "Press Enter to separate multiple labels, e.g. Math English")}
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                rows={3}
+              />
+              <button
+                className="cs-labels-add-btn"
+                disabled={parseTags(tagInput).length === 0 || selectedEntries.length === 0}
+                onClick={applyTagsToSelected}
+              >
+                {t("uploadSection.addToSelected", "Add to selected")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="cs-labels-hint">{t("uploadSection.selectFileToAddTags")}</p>
+        )
       )}
 
       {/* ── File Table ── */}
@@ -462,6 +483,7 @@ return (
                     type="checkbox"
                     checked={allSelected}
                     onChange={toggleSelectAll}
+                    disabled={stagedEntries.length === 0}
                     className="cs-checkbox"
                   />
                 </th>
@@ -469,6 +491,9 @@ return (
                 <th>{t("uploadSection.type")}</th>
                 <th>{t("uploadSection.size")}</th>
                 <th>{t("uploadSection.status")}</th>
+                {entries.some((e) => e.isVideo) && (
+                  <th className="cs-col-vs">{t("uploadSection.summarize")}</th>
+                )}
                 <th></th>
               </tr>
             </thead>
@@ -483,6 +508,7 @@ return (
                       type="checkbox"
                       checked={entry.selected}
                       onChange={() => toggleSelect(entry.id)}
+                      disabled={entry.status !== "STAGED"}
                       className="cs-checkbox"
                     />
                   </td>
@@ -492,8 +518,16 @@ return (
                     </span>
                     {entry.tags.length > 0 && (
                       <div className="cs-row-tags">
-                        {entry.tags.map((t) => (
-                          <span key={t} className="cs-row-chip">{t}</span>
+                        {entry.tags.map((tg) => (
+                          <span key={tg} className="cs-row-chip">
+                            {tg}
+                            {entry.status === "STAGED" && (
+                              <button
+                                className="cs-row-chip-remove"
+                                onClick={(e) => { e.stopPropagation(); removeTag(entry.id, tg); }}
+                              >✕</button>
+                            )}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -522,22 +556,53 @@ return (
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <span
-                          className={`cs-status-badge cs-status-badge--${entry.status.toLowerCase()}`}
-                        >
-                          {getStatusLabel(entry.status)}
-                        </span>
-                      </>
+                      <span
+                        className={`cs-status-badge cs-status-badge--${entry.status.toLowerCase()}`}
+                      >
+                        {getStatusLabel(entry.status)}
+                      </span>
                     )}
                   </td>
+                  {entries.some((e) => e.isVideo) && (
+                    <td className="cs-col-vs">
+                      {entry.isVideo ? (
+                        entry.status === "STAGED" ? (
+                          <label className="cs-vs-toggle" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={entry.vsEnabled}
+                              onChange={() => updateEntry(entry.id, { vsEnabled: !entry.vsEnabled })}
+                              className="cs-checkbox"
+                            />
+                          </label>
+                        ) : entry.videoSummaryStatus === "PROCESSING" ? (
+                          <span className="cs-status-badge cs-status-badge--summarizing">
+                            <span className="cs-spinner" />
+                            {t("uploadSection.summarizing")}
+                          </span>
+                        ) : entry.videoSummaryStatus === "COMPLETED" ? (
+                          <span className="cs-status-badge cs-status-badge--summarized">
+                            {t("uploadSection.summarized")}
+                          </span>
+                        ) : entry.videoSummaryStatus === "FAILED" ? (
+                          <span className="cs-status-badge cs-status-badge--summary-failed">
+                            {t("uploadSection.summaryFailed")}
+                          </span>
+                        ) : entry.status === "COMPLETED" && !entry.vsEnabled ? (
+                          <span className="cs-vs-off">{t("uploadSection.vsOff")}</span>
+                        ) : null
+                      ) : (
+                        <span className="cs-vs-na">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="cs-col-remove">
                     {entry.status !== "FAILED" && (
                       <button
                         className="cs-remove-btn"
-                        disabled={ACTIVE.includes(entry.status)}
+                        disabled={ACTIVE.includes(entry.status) || entry.videoSummaryStatus === "PROCESSING"}
                         onClick={() => setConfirmRemoveId(entry.id)}
-                        title={ACTIVE.includes(entry.status) ? "Cannot remove while uploading" : "Remove file"}
+                        title={ACTIVE.includes(entry.status) || entry.videoSummaryStatus === "PROCESSING" ? "Cannot remove while processing" : "Remove file"}
                       >
                         🗑
                       </button>
@@ -556,8 +621,16 @@ return (
                 Object.values(pollTimers.current).forEach(clearInterval);
                 pollTimers.current = {};
                 setEntries([]);
-                dispatch(setCsHasUploads(false));
-                dispatch(setCsUploadsComplete(false));
+                // Re-check if backend DB still has searchable data
+                csCheckHasData().then((hasData) => {
+                  dispatch(setCsDbHasData(hasData));
+                  dispatch(setCsHasUploads(hasData));
+                  dispatch(setCsUploadsComplete(hasData));
+                }).catch(() => {
+                  dispatch(setCsDbHasData(false));
+                  dispatch(setCsHasUploads(false));
+                  dispatch(setCsUploadsComplete(false));
+                });
               }}
             >
               {t("uploadSection.clearAll")}

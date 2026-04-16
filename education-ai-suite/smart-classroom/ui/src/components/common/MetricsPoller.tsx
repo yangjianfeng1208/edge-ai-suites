@@ -11,7 +11,6 @@ const MetricsPoller: React.FC = () => {
   const aiProcessing = useAppSelector(s => s.ui.aiProcessing);
   const csProcessing = useAppSelector(s => s.ui.csProcessing);
   const summaryStatus = useAppSelector(s => s.summary.status);
-  const monitoringPaused = useAppSelector(s => s.ui.monitoringPaused);
   const dispatch = useAppDispatch();
 
   const timeoutRef = useRef<number | null>(null);
@@ -31,12 +30,6 @@ const MetricsPoller: React.FC = () => {
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
       finalFetchDoneRef.current = false;
       return; // keep previous metrics visible
-    }
-
-    // Stop polling when monitoring has been paused by the duration timer
-    if (monitoringPaused) {
-      if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
-      return;
     }
 
     if (summaryStatus === 'done' && !aiProcessing && !csProcessing) {
@@ -65,7 +58,7 @@ const MetricsPoller: React.FC = () => {
       cancelled = true;
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     };
-  }, [sessionId, aiProcessing, csProcessing, summaryStatus, monitoringPaused, dispatch]);
+  }, [sessionId, aiProcessing, csProcessing, summaryStatus, dispatch]);
 
   return null;
 };

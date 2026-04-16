@@ -144,15 +144,14 @@
       "backCamera": "Back",
       "boardCamera": "Board",
       "allCameras": "All",
-      "noSessionActiveContentSearch": "No active session. Upload content to begin searching."
+      "noSessionActiveContentSearch": "No active session. Upload content to begin searching.",
+      "vlm": "VLM",
+      "visualEmbedding": "Visual Embedding",
+      "docEmbedding": "Doc Embedding",
+      "reranker": "Reranker",
+      "vectorDb": "Vector DB"
     },
-    "monitoring": {
-    "pausedTitle": "Resource Monitoring Paused",
-    "pausedMessage": "Metric polling has automatically stopped after {{duration}} minutes. Resume to continue tracking performance data.",
-    "resumeAriaLabel": "Resume resource metric polling",
-    "resumeButton": "Resume"
-  },
-  "errors": {
+    "errors": {
       "projectNameRequired": "Project name is required",
       "failedToStartRecording": "Failed to start recording",
       "failedToStopRecording": "Failed to stop recording",
@@ -200,9 +199,7 @@
     "durationError":"Duration Mismatch - check your files",
     "durationMismatch":"⚠️ Audio and video durations don't match. Please ensure both files have similar lengths.",
     "durationExtractionFailed":"⚠️ Unable to extract audio or video duration. Please check your files and try again.",
-    "contentPreparationFailed":"Content preparation failed. Please try again.",
-    "noLabels":"No labels available",
-    "processing":"Some files are still processing. You can search now; results may expand once processing finishes."
+    "contentPreparationFailed":"Content preparation failed. Please try again."
   },
   "contentSearch": {
     "title": "Content Search",
@@ -215,18 +212,25 @@
     "upload":"Upload",
     "dragDrop":"Drag & drop your files here",
     "orClick":"or click to browse",
-    "supportedTypes":"Supported: MP4, PPT, DOCX, PDF, JPG, CSV, TXT",
-    "selectFileToAddTags":"Select an uploaded file to add tags.",
+    "supportedTypes":"Supported file types: MP4, JPG, PNG, DOCX...",
+    "maxTotalSize":"Max total size: 500 MB",
+    "selectFileToAddTags":"To add tags, please select the file.",
     "addTags":"Add Tags",
-    "enterTags":"Enter tags separated by commas",
+    "enterTags":"Add tag — press Enter or comma",
+    "pressEnterToAdd":"Press Enter or comma to add tag",
+    "clearTags":"Clear all tags",
+    "labelsTitle":"Labels",
+    "labelsKey":"Labels",
+    "enterTagsPlaceholder":"Press Enter to separate multiple labels, e.g. Math\nEnglish",
+    "addToSelected":"Add to selected",
     "fileName":"File Name",
     "size":"Size",
     "type":"Type",
-    "status":"Status",
+    "status":"Upload",
     "retry":" ↻ Retry",
     "clearAll":"Clear All",
     "uploadFiles":"Upload Files",
-    "removeFileConfirmation":"Are you sure you want to remove this file. Continue?",
+    "removeFileConfirmation":"Removing this file will stop processing. Continue?",
     "cancel":"Cancel",
     "remove":"Remove",
     "pending":"Pending...",
@@ -234,6 +238,11 @@
     "processing":"Processing...",
     "failed":"Failed",
     "uploaded":"Uploaded ✔",
+    "summarizing":"Summarizing...",
+    "summarize":"Summary",
+    "summarized":"Summarized ✔",
+    "summaryFailed":"Summary Failed",
+    "vsOff":"Off",
     "alreadyExists":"Already Exists"
   },
   "searchSection": {
@@ -249,11 +258,13 @@
     "images": "Images",
     "videos": "Videos",
     "selectAtLeastOneType": "Please select at least one type",
-    "filterByLabel": "Filter by labels",
+    "filterByLabel": "Filter by Labels",
+    "selectLabels": "Select labels...",
     "topResults": "Top Results:",
     "searching": "Searching...",
     "search": "Search",
     "reset": "Reset",
+    "processingBanner": "Some files are still processing. You can search now; results may expand once processing finishes.",
     "searchNotAvailable": "Search is not available.",
     "filesStillUploading": "Files are still uploading...",
     "uploadFilesToEnable": "Upload files to enable search."
@@ -271,7 +282,8 @@
     "time": "Time:",
     "relevance": "Relevance:",
     "labels": "Labels",
-    "score": "Score"
+    "score": "Score",
+    "scoreFormat": "Score format"
   }
 }
  

@@ -784,9 +784,9 @@ export async function csUploadIngest(
       throw new Error(json.message || `Upload-ingest failed (${res.status})`);
     }
     const data = await res.json();
-    // code 40901 = file already exists; backend returns task_id for cleanup
+    // code 40901 = file already exists; backend returns 200 OK with no task_id
     if (data.code === 40901) {
-      return { task_id: data.data?.task_id ?? '', status: 'ALREADY_EXISTS', file_key: data.data?.file_key };
+      return { task_id: '', status: 'ALREADY_EXISTS', file_key: data.data?.file_key };
     }
     const payload = data.data ?? data;
     if (!payload?.task_id) {
@@ -851,6 +851,49 @@ export async function csCleanupTask(
       message: data.message ?? '',
     };
   });
+}
+
+// Check if the content search backend already has indexed data
+export async function csCheckHasData(): Promise<boolean> {
+  try {
+    const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/task/list?status=COMPLETED&limit=1`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    const tasks = json?.data ?? json;
+    return Array.isArray(tasks) && tasks.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Fetch content search model & database configuration
+export async function csGetConfig(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/system/config`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
+// Fetch all unique tags stored in the backend file_assets table
+export async function csFetchTags(): Promise<string[]> {
+  try {
+    const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/object/tags`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const tags = json?.data;
+    return Array.isArray(tags) ? tags : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function createSession(): Promise<{ sessionId: string }> {
@@ -1042,6 +1085,17 @@ export async function searchContent(sessionId: string, query: string, topK: numb
   });
 }
 
+// Content Search helpers
+export function csDownloadUrl(fileKey: string): string {
+  return `${CONTENT_SEARCH_API_URL}/api/v1/object/download?file_key=${encodeURIComponent(fileKey)}`;
+}
+
+export function extractFileKey(filePath: string): string | null {
+  if (!filePath) return null;
+  // Remove protocol and bucket prefix: "local://content-search/runs/..." -> "runs/..."
+  return filePath.replace(/^[a-z]+:\/\/[^/]+\//, '');
+}
+
 // Content Search API - search for objects
 export async function csSearch(params: CsSearchParams): Promise<CsSearchResult[]> {
   try {
@@ -1058,9 +1112,10 @@ export async function csSearch(params: CsSearchParams): Promise<CsSearchResult[]
       throw new Error(`Content search failed: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    // API returns { code, data: { results: [...] }, message, timestamp }
-    return Array.isArray(data?.data?.results) ? data.data.results : [];
+    const json = await response.json();
+    // Backend wraps response as { code: 20000, data: { results: [...] }, message: "..." }
+    const results = json?.data?.results;
+    return Array.isArray(results) ? results : [];
   } catch (error) {
     console.error('csSearch error:', error);
     return [];
