@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import "../../assets/css/UploadSection.css";
-import { csUploadIngest, csQueryTask, csIngest, csCleanupTask, csCheckHasData, createSession, startMonitoring } from "../../services/api";
+import { csUploadIngest, csQueryTask, csIngest, csCleanupTask, csCheckHasData, createSession, startMonitoring, csGetConfig } from "../../services/api";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { setCsProcessing, setSessionId, setMonitoringActive, setCsUploadsComplete, setCsHasUploads, setCsDbHasData, addCsAvailableLabels } from "../../redux/slices/uiSlice";
 
@@ -75,6 +75,13 @@ const UploadSection: React.FC = () => {
   const [entries, setEntries] = useState<UploadEntry[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [summarizationEnabled, setSummarizationEnabled] = useState(false);
+
+  useEffect(() => {
+    csGetConfig().then((cfg) => {
+      setSummarizationEnabled(cfg.video_summarization_enabled === true);
+    });
+  }, []);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
   const stagedEntries = entries.filter((e) => e.status === "STAGED");
@@ -491,7 +498,7 @@ return (
                 <th>{t("uploadSection.type")}</th>
                 <th>{t("uploadSection.size")}</th>
                 <th>{t("uploadSection.status")}</th>
-                {entries.some((e) => e.isVideo) && (
+                {summarizationEnabled && entries.some((e) => e.isVideo) && (
                   <th className="cs-col-vs">{t("uploadSection.summarize")}</th>
                 )}
                 <th></th>
@@ -563,7 +570,7 @@ return (
                       </span>
                     )}
                   </td>
-                  {entries.some((e) => e.isVideo) && (
+                  {summarizationEnabled && entries.some((e) => e.isVideo) && (
                     <td className="cs-col-vs">
                       {entry.isVideo ? (
                         entry.status === "STAGED" ? (

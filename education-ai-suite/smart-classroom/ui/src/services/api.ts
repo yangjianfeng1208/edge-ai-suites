@@ -869,7 +869,7 @@ export async function csCheckHasData(): Promise<boolean> {
 }
 
 // Fetch content search model & database configuration
-export async function csGetConfig(): Promise<Record<string, string>> {
+export async function csGetConfig(): Promise<Record<string, any>> {
   try {
     const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/system/config`, {
       cache: 'no-store',

@@ -103,7 +103,7 @@
 
 /* ─── Summarize Column ───────────────────────────────────── */
 
-.cs-col-vs { width: 80px; text-align: center; }
+.cs-col-vs { width: 100px; text-align: center; }
 
 .cs-vs-toggle {
   display: inline-flex;
@@ -213,10 +213,10 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-family: var(--font-display);
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 3px;
   white-space: nowrap;
   text-align: center;
