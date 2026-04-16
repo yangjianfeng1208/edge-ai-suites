@@ -320,147 +320,47 @@
   color: #d32f2f;
 }
 
-/* ───────── Label Tags Input ───────── */
+/* ───────── Filter Dropdown ───────── */
 
-.cs-search-label-tags-list {
+.cs-search-filter-placeholder {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.cs-search-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cs-search-filter-dropdown-item {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  min-height: 44px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: white;
-  align-items: center;
-}
-
-.cs-search-label-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: rgba(25, 118, 210, 0.1);
-  border: 1px solid rgba(25, 118, 210, 0.3);
-  border-radius: 4px;
+  cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
-  color: #1976d2;
-  max-width: 200px;
+  color: #333;
+  transition: background 0.15s;
 }
 
-.cs-search-label-tag__text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cs-search-filter-dropdown-item:hover {
+  background: #f5f5f5;
 }
 
-.cs-search-label-tag__remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.cs-search-filter-dropdown-item input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  border: none;
-  background: transparent;
-  color: #1976d2;
+  accent-color: #1976d2;
   cursor: pointer;
-  border-radius: 3px;
-  padding: 0;
-  flex-shrink: 0;
-  opacity: 0.7;
-  transition: all 0.15s;
-}
-
-.cs-search-label-tag__remove:hover {
-  opacity: 1;
-  background: rgba(25, 118, 210, 0.15);
-}
-
-.cs-search-label-tag-input-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 100px;
-}
-
-.cs-search-label-tag__input {
-  border: none;
-  background: transparent;
-  padding: 4px 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: #1976d2;
-  outline: none;
-  min-width: 60px;
-  flex: 1;
-}
-
-.cs-search-label-tag__input::placeholder {
-  color: rgba(25, 118, 210, 0.45);
-  font-weight: 400;
-}
-
-.cs-search-label-tag__input:disabled {
-  cursor: not-allowed;
-}
-
-.cs-search-label-tag-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px dashed #9ca3af;
-  background: transparent;
-  color: #6b7280;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-
-.cs-search-label-tag-add:hover:not(:disabled) {
-  border-color: #1976d2;
-  border-style: solid;
-  background: rgba(25, 118, 210, 0.05);
-  color: #1976d2;
-}
-
-.cs-search-label-tag-add:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ───────── Label Suggestions ───────── */
-
-.cs-search-label-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.cs-search-label-suggestion {
-  padding: 3px 10px;
-  border: 1px dashed rgba(25, 118, 210, 0.4);
-  border-radius: 4px;
-  background: transparent;
-  color: #1976d2;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.cs-search-label-suggestion:hover:not(:disabled) {
-  background: rgba(25, 118, 210, 0.08);
-  border-style: solid;
-}
-
-.cs-search-label-suggestion:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* ───────── Top Results Section ───────── */
@@ -617,6 +517,37 @@
   font-size: 12px;
   line-height: 16px;
   color: #6A6D75;
+}
+
+/* ───────── Processing Info Banner ───────── */
+
+.cs-search-processing-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: #2c4a7c;
+  color: #ffffff;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.cs-search-processing-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  background: #ffffff;
+  color: #2c4a7c;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* ─── Media Queries ──────────────────────────────────────── */

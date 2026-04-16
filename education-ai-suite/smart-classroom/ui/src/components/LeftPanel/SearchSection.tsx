@@ -1,18 +1,19 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import "../../assets/css/SearchSection.css";
-import { csSearch } from "../../services/api";
+import { csSearch, csFetchTags } from "../../services/api";
 import ResultSection, { type CsSearchResult } from "./ResultSection";
 import warningIcon from "../../assets/images/warning-info.svg";
 import cameraIcon from "../../assets/images/camera-icon.svg";
 import noSearchIcon from "../../assets/images/no-search-icon.svg";
-import { useAppSelector } from "../../redux/hooks";
+import { useAppDispatch, useAppSelector } from "../../redux/hooks";
+import { addCsAvailableLabels } from "../../redux/slices/uiSlice";
 
 type SearchTab = "text" | "image";
 type SearchType = "document" | "image" | "video";
 
 const MAX_QUERY_LENGTH = 100;
-const DEFAULT_MAX_RESULTS = 10;
+const DEFAULT_MAX_RESULTS = 5;
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg"]);
 
@@ -38,9 +39,21 @@ const SearchSection: React.FC = () => {
   const { t } = useTranslation();
   const csUploadsComplete = useAppSelector((s) => s.ui.csUploadsComplete);
   const csHasUploads = useAppSelector((s) => s.ui.csHasUploads);
+  const csDbHasData = useAppSelector((s) => s.ui.csDbHasData);
+  const csProcessing = useAppSelector((s) => s.ui.csProcessing);
   const csAvailableLabels = useAppSelector((s) => s.ui.csAvailableLabels);
+  const dispatch = useAppDispatch();
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const labelInputRef = useRef<HTMLInputElement>(null);
+  const filterBoxRef = useRef<HTMLDivElement>(null);
+
+  // Fetch persisted tags from backend on mount and when uploads complete
+  useEffect(() => {
+    if (csDbHasData || csUploadsComplete) {
+      csFetchTags().then((tags) => {
+        if (tags.length > 0) dispatch(addCsAvailableLabels(tags));
+      });
+    }
+  }, [csDbHasData, csUploadsComplete, dispatch]);
 
   const [activeTab, setActiveTab] = useState<SearchTab>("text");
 
@@ -55,7 +68,7 @@ const SearchSection: React.FC = () => {
   );
 
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [labelInput, setLabelInput] = useState("");
+  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
 
   // Reset search when all uploads are cleared
   useEffect(() => {
@@ -68,7 +81,7 @@ const SearchSection: React.FC = () => {
       setImagePreview(null);
       setSelectedTypes(new Set(["document", "image", "video"]));
       setSelectedLabels([]);
-      setLabelInput("");
+      setIsLabelDropdownOpen(false);
       setMaxResults(DEFAULT_MAX_RESULTS);
       setSearchResults([]);
       setShowResults(false);
@@ -117,13 +130,24 @@ const SearchSection: React.FC = () => {
     });
   }, []);
 
-  const addLabel = useCallback(() => {
-    const value = labelInput.trim();
-    if (value && !selectedLabels.includes(value)) {
-      setSelectedLabels((prev) => [...prev, value]);
+  const toggleLabel = useCallback((label: string) => {
+    setSelectedLabels((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterBoxRef.current && !filterBoxRef.current.contains(event.target as Node)) {
+        setIsLabelDropdownOpen(false);
+      }
+    };
+    if (isLabelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
     }
-    setLabelInput("");
-  }, [labelInput, selectedLabels]);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isLabelDropdownOpen]);
 
   const removeLabel = useCallback((label: string) => {
     setSelectedLabels((prev) => prev.filter((l) => l !== label));
@@ -216,7 +240,7 @@ const SearchSection: React.FC = () => {
     clearImage();
     setSelectedTypes(new Set(["document", "image", "video"]));
     setSelectedLabels([]);
-    setLabelInput("");
+    setIsLabelDropdownOpen(false);
     setMaxResults(DEFAULT_MAX_RESULTS);
     setSearchResults([]);
     setShowResults(false);
@@ -232,31 +256,28 @@ const SearchSection: React.FC = () => {
           <span className="cs-search-title">{t("searchSection.title")}</span>
         </div>
 
-        {!csHasUploads ? (
-          /* No files uploaded */
+        {!csDbHasData && !csUploadsComplete ? (
+          /* No searchable data yet */
           <div className="cs-search-disabled">
-            <img 
-              src={noSearchIcon} 
-              alt="search unavailable" 
+            <img
+              src={noSearchIcon}
+              alt="search unavailable"
               className="cs-search-disabled-icon"
             />
             <span className="cs-search-disabled-title">{t("searchSection.searchNotAvailable")}</span>
-            <span className="cs-search-disabled-hint">{t("searchSection.uploadFilesToEnable")}</span>
-          </div>
-        ) : !csUploadsComplete ? (
-          /* Files uploading but none completed yet */
-          <div className="cs-search-disabled">
-            <img 
-              src={noSearchIcon} 
-              alt="search unavailable" 
-              className="cs-search-disabled-icon"
-            />
-            <span className="cs-search-disabled-title">{t("searchSection.searchNotAvailable")}</span>
-            <span className="cs-search-disabled-hint">{t("searchSection.filesStillUploading")}</span>
+            <span className="cs-search-disabled-hint">
+              {csHasUploads ? t("searchSection.filesStillUploading") : t("searchSection.uploadFilesToEnable")}
+            </span>
           </div>
         ) : (
-          /* Full search form when at least one upload is complete */
+          /* Search form — DB has data or at least one upload completed */
           <>
+            {csProcessing && (
+              <div className="cs-search-processing-banner">
+                <span className="cs-search-processing-icon">ℹ</span>
+                <span>{t("searchSection.processingBanner")}</span>
+              </div>
+            )}
             <div className="cs-search-tabs">
               <button
                 className={`cs-search-tab ${activeTab === "text" ? "cs-search-tab--active" : ""}`}
@@ -380,80 +401,52 @@ const SearchSection: React.FC = () => {
             <div className="cs-search-divider" />
 
             {/* Filter by Label */}
-            <div className={`cs-search-filter-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>
-              <div className="cs-search-filter-label">{t("searchSection.filterByLabel")}</div>
-              <div className="cs-search-label-tags-list">
-                {selectedLabels.map((label) => (
-                  <div key={label} className="cs-search-label-tag">
-                    <span className="cs-search-label-tag__text">{label}</span>
-                    <button
-                      className="cs-search-label-tag__remove"
-                      onClick={() => removeLabel(label)}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6L6 18M6 6l12 12" />
-                      </svg>
-                    </button>
+            {csAvailableLabels.length > 0 && (
+              <div className={`cs-search-filter-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>
+                <div className="cs-search-filter-label">{t("searchSection.filterByLabel")}</div>
+                <div
+                  ref={filterBoxRef}
+                  className="cs-search-filter-box"
+                  onClick={() => hasSelectedType && hasValidInput && setIsLabelDropdownOpen(!isLabelDropdownOpen)}
+                >
+                  <div className="cs-search-filter-chips">
+                    {selectedLabels.length === 0 && (
+                      <span className="cs-search-filter-placeholder">
+                        {t("searchSection.selectLabels", "Select labels...")}
+                      </span>
+                    )}
+                    {selectedLabels.map((label) => (
+                      <span key={label} className="cs-search-chip">
+                        {label}
+                        <button
+                          className="cs-search-chip-remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeLabel(label);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
                   </div>
-                ))}
-                <div className="cs-search-label-tag-input-wrap">
-                  <input
-                    ref={labelInputRef}
-                    className="cs-search-label-tag__input"
-                    type="text"
-                    placeholder={t("searchSection.enterLabel", "Enter label...")}
-                    value={labelInput}
-                    onChange={(e) => setLabelInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addLabel();
-                      }
-                    }}
-                    onBlur={() => {
-                      if (labelInput.trim()) addLabel();
-                    }}
-                    disabled={!hasSelectedType || !hasValidInput}
-                  />
-                  <button
-                    className="cs-search-label-tag-add"
-                    type="button"
-                    title={t("searchSection.addLabel", "Add label")}
-                    onClick={() => {
-                      addLabel();
-                      labelInputRef.current?.focus();
-                    }}
-                    disabled={!hasSelectedType || !hasValidInput || !labelInput.trim()}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </button>
+                  {isLabelDropdownOpen && hasSelectedType && hasValidInput && (
+                    <div className="cs-search-filter-dropdown" onClick={(e) => e.stopPropagation()}>
+                      {csAvailableLabels.map((label) => (
+                        <label key={label} className="cs-search-filter-dropdown-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedLabels.includes(label)}
+                            onChange={() => toggleLabel(label)}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-              {/* Available label suggestions */}
-              {csAvailableLabels.length > 0 && (
-                <div className="cs-search-label-suggestions">
-                  {csAvailableLabels
-                    .filter((l) => !selectedLabels.includes(l))
-                    .map((label) => (
-                      <button
-                        key={label}
-                        className="cs-search-label-suggestion"
-                        type="button"
-                        onClick={() => {
-                          if (!selectedLabels.includes(label)) {
-                            setSelectedLabels((prev) => [...prev, label]);
-                          }
-                        }}
-                        disabled={!hasSelectedType || !hasValidInput}
-                      >
-                        + {label}
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Top Results */}
             <div className={`cs-search-results-section ${!hasSelectedType || !hasValidInput ? "cs-search-filter-disabled" : ""}`}>

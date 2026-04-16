@@ -853,6 +853,36 @@ export async function csCleanupTask(
   });
 }
 
+// Check if the content search backend already has indexed data
+export async function csCheckHasData(): Promise<boolean> {
+  try {
+    const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/task/list?status=COMPLETED&limit=1`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    const tasks = json?.data ?? json;
+    return Array.isArray(tasks) && tasks.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Fetch all unique tags stored in the backend file_assets table
+export async function csFetchTags(): Promise<string[]> {
+  try {
+    const res = await fetch(`${CONTENT_SEARCH_API_URL}/api/v1/object/tags`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const tags = json?.data;
+    return Array.isArray(tags) ? tags : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function createSession(): Promise<{ sessionId: string }> {
   return safeApiCall(async () => {
     const res = await fetch(`${BASE_URL}/create-session`, {

@@ -17,6 +17,8 @@ export interface CsSearchResultMeta {
   file_path?: string;
   type?: string;
   video_pin_second?: number;
+  video_start_second?: number;
+  video_end_second?: number;
   start_time?: number;
   end_time?: number;
   doc_page_number?: number;
@@ -55,19 +57,23 @@ function fileExtension(name: string): string {
   return lower.slice(lower.lastIndexOf("."));
 }
 
-function formatScore(score: number): string {
+type ScoreFormat = "percent" | "decimal";
+
+function formatScore(score: number, fmt: ScoreFormat = "percent"): string {
+  if (fmt === "decimal") {
+    return (score / 100).toFixed(2);
+  }
   if (score <= 0) return "0%";
   if (score < 1) return "< 1%";
   return `${Math.round(score)}%`;
 }
 
 function formatTimestamp(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = Math.floor(totalSeconds % 60);
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const total = Math.floor(totalSeconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 // ── Video Thumbnail ──────────────────────────────────────────
@@ -90,18 +96,12 @@ const VideoThumbnail: React.FC<{ url: string; seekTime: number }> = ({
       video.load();
     };
 
-    video.addEventListener("loadedmetadata", () => {
-      video.currentTime = Math.max(
-        0,
-        Math.min(seekTime || 1, video.duration - 0.1)
-      );
-    });
-
-    video.addEventListener("seeked", () => {
+    const captureFrame = () => {
       try {
         const canvas = document.createElement("canvas");
         const w = video.videoWidth;
         const h = video.videoHeight;
+        if (!w || !h) return;
         const maxW = 300;
         const scale = Math.min(1, maxW / w);
         canvas.width = Math.round(w * scale);
@@ -117,15 +117,26 @@ const VideoThumbnail: React.FC<{ url: string; seekTime: number }> = ({
         console.warn("Video thumbnail capture failed:", e);
       }
       cleanup();
-    });
+    };
 
+    const doSeek = () => {
+      const target = Math.max(0, Math.min(seekTime || 1, video.duration - 0.1));
+      video.currentTime = target;
+    };
+
+    video.addEventListener("seeked", captureFrame);
     video.addEventListener("error", cleanup);
+
+    // Handle both cached and uncached video metadata
+    video.addEventListener("loadedmetadata", doSeek);
 
     const timer = setTimeout(() => {
       if (active && !loaded) cleanup();
-    }, 8000);
+    }, 10000);
 
-    video.src = url;
+    // Cache-bust: each thumbnail instance loads its own copy
+    const separator = url.includes("?") ? "&" : "?";
+    video.src = `${url}${separator}_thumb=${seekTime}`;
 
     return () => {
       active = false;
@@ -280,10 +291,19 @@ const PreviewModal: React.FC<{
     };
   }, [onClose]);
 
-  const handleVideoLoaded = () => {
+  const handleVideoReady = () => {
     const video = videoRef.current;
-    if (video && meta.video_pin_second) {
-      video.currentTime = meta.video_pin_second;
+    if (!video) return;
+    const seekTo = meta.video_start_second ?? meta.video_pin_second;
+    if (seekTo != null && seekTo > 0) {
+      const onSeeked = () => {
+        video.removeEventListener("seeked", onSeeked);
+        video.play().catch(() => {});
+      };
+      video.addEventListener("seeked", onSeeked);
+      video.currentTime = seekTo;
+    } else {
+      video.play().catch(() => {});
     }
   };
 
@@ -292,15 +312,14 @@ const PreviewModal: React.FC<{
       return <p className="cs-preview-empty">Preview not available</p>;
 
     if (fileType === "video") {
-      const startTime = meta.video_pin_second || 0;
       return (
         <video
           ref={videoRef}
           className="cs-preview-video"
           controls
-          autoPlay
-          src={`${downloadUrl}#t=${startTime}`}
-          onLoadedMetadata={handleVideoLoaded}
+          preload="auto"
+          src={downloadUrl}
+          onLoadedData={handleVideoReady}
         />
       );
     }
@@ -356,9 +375,9 @@ const PreviewModal: React.FC<{
         <div className="cs-preview-info-bar">
           <span>Type: {fileType}</span>
           <span>Score: {formatScore(result?.score ?? 0)}</span>
-          {fileType === "video" && meta.video_pin_second != null && (
+          {fileType === "video" && meta.video_start_second != null && meta.video_end_second != null && (
             <span>
-              Match: {formatTimestamp(Math.floor(meta.video_pin_second))}
+              Time: {formatTimestamp(meta.video_start_second)} - {formatTimestamp(meta.video_end_second)}
             </span>
           )}
           {fileType === "document" && meta.doc_page_number != null && (
@@ -378,8 +397,9 @@ const PreviewModal: React.FC<{
 
 const ResultCard: React.FC<{
   result: SearchResult;
+  scoreFormat: ScoreFormat;
   onPreview: () => void;
-}> = ({ result, onPreview }) => {
+}> = ({ result, scoreFormat, onPreview }) => {
   const { t } = useTranslation();
   const meta = result?.meta || {};
   const fileName = meta.file_name || getFileName(result);
@@ -453,7 +473,7 @@ const ResultCard: React.FC<{
 
         {/* Summary snippet */}
         {(meta.summary_text || meta.chunk_text) && (
-          <div className="cs-result-item-summary">
+          <div className="cs-result-item-summary" title={meta.summary_text || meta.chunk_text}>
             {(meta.summary_text || meta.chunk_text || "").slice(0, 100)}
             {(meta.summary_text || meta.chunk_text || "").length > 100
               ? "\u2026"
@@ -461,10 +481,10 @@ const ResultCard: React.FC<{
           </div>
         )}
 
-        {/* Metadata: timestamp or page */}
-        {fileType === "video" && meta.video_pin_second != null && (
+        {/* Metadata: time range or page */}
+        {fileType === "video" && meta.video_start_second != null && meta.video_end_second != null && (
           <div className="cs-result-item-meta">
-            Time: {formatTimestamp(Math.floor(meta.video_pin_second))}
+            {t("resultSection.time")} {formatTimestamp(meta.video_start_second)} - {formatTimestamp(meta.video_end_second)}
           </div>
         )}
         {fileType === "document" && meta.doc_page_number != null && (
@@ -493,7 +513,7 @@ const ResultCard: React.FC<{
       <div className="cs-result-item-score-section">
         <span className="cs-result-item-score-box">
           {t("resultSection.score")}:{" "}
-          {formatScore(result?.score ?? 0)}
+          {formatScore(result?.score ?? 0, scoreFormat)}
         </span>
       </div>
     </div>
@@ -507,24 +527,40 @@ const ResultCard: React.FC<{
 const ResultSection: React.FC<ResultSectionProps> = ({ results }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ResultTab>("all");
+  const [scoreFormat, setScoreFormat] = useState<ScoreFormat>("percent");
   const [previewResult, setPreviewResult] = useState<SearchResult | null>(
     null
   );
 
   const safeResults = Array.isArray(results) ? results : [];
 
+  const MIN_SCORE = 60;
+
   const filteredResults = useMemo(() => {
     const filtered =
       activeTab === "all"
         ? safeResults
         : safeResults.filter((r) => r?.meta?.type === activeTab);
-    return [...filtered].sort((a, b) => (b?.score ?? 0) - (a?.score ?? 0));
+    return [...filtered]
+      .filter((r) => (r?.score ?? 0) >= MIN_SCORE)
+      .sort((a, b) => (b?.score ?? 0) - (a?.score ?? 0));
   }, [safeResults, activeTab]);
 
   return (
     <div className="cs-result-card">
       <div className="cs-result-header">
         <span className="cs-result-title">{t("resultSection.title")}</span>
+        <div className="cs-result-score-format">
+          <span className="cs-result-score-format-label">{t("resultSection.scoreFormat")}</span>
+          <select
+            className="cs-result-score-format-select"
+            value={scoreFormat}
+            onChange={(e) => setScoreFormat(e.target.value as ScoreFormat)}
+          >
+            <option value="percent">%</option>
+            <option value="decimal">0-1</option>
+          </select>
+        </div>
       </div>
       <div className="cs-result-subtitle">{t("resultSection.subtitle")}</div>
       <div className="cs-result-tabs">
@@ -576,6 +612,7 @@ const ResultSection: React.FC<ResultSectionProps> = ({ results }) => {
             <ResultCard
               key={result?.id || index}
               result={result}
+              scoreFormat={scoreFormat}
               onPreview={() => setPreviewResult(result)}
             />
           ))

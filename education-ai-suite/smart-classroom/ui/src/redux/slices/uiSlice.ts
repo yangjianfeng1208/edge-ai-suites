@@ -73,6 +73,7 @@ export interface UIState {
   transcriptionDone: boolean;
   csUploadsComplete: boolean;
   csHasUploads: boolean;
+  csDbHasData: boolean;
   csAvailableLabels: string[];
 }
  
@@ -131,6 +132,7 @@ const initialState: UIState = {
   csProcessing: false,
   csUploadsComplete: false,
   csHasUploads: false,
+  csDbHasData: false,
   csAvailableLabels: [],
 };
 
@@ -512,6 +514,10 @@ const uiSlice = createSlice({
       state.csHasUploads = action.payload;
     },
 
+    setCsDbHasData(state, action: PayloadAction<boolean>) {
+      state.csDbHasData = action.payload;
+    },
+
     addCsAvailableLabels(state, action: PayloadAction<string[]>) {
       const existing = new Set(state.csAvailableLabels);
       for (const label of action.payload) {
@@ -532,11 +538,13 @@ const uiSlice = createSlice({
       const preservedAudioDevicesLoading = state.audioDevicesLoading;
       const preservedCsHasUploads = state.csHasUploads;
       const preservedCsUploadsComplete = state.csUploadsComplete;
+      const preservedCsDbHasData = state.csDbHasData;
       Object.assign(state, initialState);
       state.hasAudioDevices = preservedAudioDevices;
       state.audioDevicesLoading = preservedAudioDevicesLoading;
       state.csHasUploads = preservedCsHasUploads;
       state.csUploadsComplete = preservedCsUploadsComplete;
+      state.csDbHasData = preservedCsDbHasData;
       state.audioStatus = preservedAudioDevicesLoading ? 'checking' : (preservedAudioDevices ? 'ready' : 'no-devices');
       state.contentSegmentationStatus = 'idle';
       state.contentSegmentationEnabled = false;
@@ -608,6 +616,7 @@ export const {
   setCsProcessing,
   setCsUploadsComplete,
   setCsHasUploads,
+  setCsDbHasData,
   addCsAvailableLabels,
 } = uiSlice.actions;
  

@@ -25,6 +25,34 @@
   color: #2b2b2b;
 }
 
+.cs-result-score-format {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cs-result-score-format-label {
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.cs-result-score-format-select {
+  padding: 4px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cs-result-score-format-select:focus {
+  border-color: #1976d2;
+}
+
 .cs-result-subtitle {
   font-weight: 500;
   font-size: 12px;
