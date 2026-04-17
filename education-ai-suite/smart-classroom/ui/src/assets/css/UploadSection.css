@@ -189,7 +189,7 @@
 .cs-col-name   { text-align: left; }
 .cs-col-type   { width: 44px; text-align: center; color: #607d8b; font-size: 11px; }
 .cs-col-size   { width: 56px; text-align: right;  color: #607d8b; }
-.cs-col-status { padding-right: 6px; text-align: center; }
+.cs-col-status { padding-right: 6px; text-align: left; }
 .cs-col-remove { width: 24px; text-align: center; }
 
 /* Checkbox */
