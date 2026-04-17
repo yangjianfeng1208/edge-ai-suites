@@ -542,6 +542,9 @@ const uiSlice = createSlice({
     resetFlow(state) {
       const preservedAudioDevices = state.hasAudioDevices;
       const preservedAudioDevicesLoading = state.audioDevicesLoading;
+      const preservedSessionId = state.sessionId;
+      const preservedMonitoringActive = state.monitoringActive;
+      const preservedMonitoringPaused = state.monitoringPaused;
       const preservedCsHasUploads = state.csHasUploads;
       const preservedCsUploadsComplete = state.csUploadsComplete;
       const preservedCsDbHasData = state.csDbHasData;
@@ -550,6 +553,9 @@ const uiSlice = createSlice({
       Object.assign(state, initialState);
       state.hasAudioDevices = preservedAudioDevices;
       state.audioDevicesLoading = preservedAudioDevicesLoading;
+      state.sessionId = preservedSessionId;
+      state.monitoringActive = preservedMonitoringActive;
+      state.monitoringPaused = preservedMonitoringPaused;
       state.csHasUploads = preservedCsHasUploads;
       state.csUploadsComplete = preservedCsUploadsComplete;
       state.csDbHasData = preservedCsDbHasData;
