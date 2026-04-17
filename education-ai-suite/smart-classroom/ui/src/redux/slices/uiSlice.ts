@@ -74,7 +74,8 @@ export interface UIState {
   transcriptionDone: boolean;
   csUploadsComplete: boolean;
   csHasUploads: boolean;
-  csTags: string[];
+  csDbHasData: boolean;
+  csAvailableLabels: string[];
 }
  
 const initialState: UIState = {
@@ -133,7 +134,8 @@ const initialState: UIState = {
   csProcessing: false,
   csUploadsComplete: false,
   csHasUploads: false,
-  csTags: [],
+  csDbHasData: false,
+  csAvailableLabels: [],
 };
 
 const uiSlice = createSlice({
@@ -518,8 +520,16 @@ const uiSlice = createSlice({
       state.csHasUploads = action.payload;
     },
 
-    setCsTags(state, action: PayloadAction<string[]>) {
-      state.csTags = action.payload;
+    setCsDbHasData(state, action: PayloadAction<boolean>) {
+      state.csDbHasData = action.payload;
+    },
+
+    addCsAvailableLabels(state, action: PayloadAction<string[]>) {
+      const existing = new Set(state.csAvailableLabels);
+      for (const label of action.payload) {
+        if (label.trim()) existing.add(label.trim());
+      }
+      state.csAvailableLabels = Array.from(existing);
     },
 
     clearSearchResults(state) {
@@ -534,11 +544,17 @@ const uiSlice = createSlice({
       const preservedAudioDevicesLoading = state.audioDevicesLoading;
       const preservedCsHasUploads = state.csHasUploads;
       const preservedCsUploadsComplete = state.csUploadsComplete;
+      const preservedCsDbHasData = state.csDbHasData;
+      const preservedCsAvailableLabels = state.csAvailableLabels;
+      const preservedCsProcessing = state.csProcessing;
       Object.assign(state, initialState);
       state.hasAudioDevices = preservedAudioDevices;
       state.audioDevicesLoading = preservedAudioDevicesLoading;
       state.csHasUploads = preservedCsHasUploads;
       state.csUploadsComplete = preservedCsUploadsComplete;
+      state.csDbHasData = preservedCsDbHasData;
+      state.csAvailableLabels = preservedCsAvailableLabels;
+      state.csProcessing = preservedCsProcessing;
       state.audioStatus = preservedAudioDevicesLoading ? 'checking' : (preservedAudioDevices ? 'ready' : 'no-devices');
       state.contentSegmentationStatus = 'idle';
       state.contentSegmentationEnabled = false;
@@ -611,7 +627,8 @@ export const {
   setCsProcessing,
   setCsUploadsComplete,
   setCsHasUploads,
-  setCsTags,
+  setCsDbHasData,
+  addCsAvailableLabels,
 } = uiSlice.actions;
  
 export default uiSlice.reducer;

@@ -144,7 +144,18 @@
     "backCamera": "后置摄像头",
     "boardCamera": "黑板摄像头",
     "allCameras": "所有摄像头",
-    "noSessionActiveContentSearch": "无活动会话。请上传内容以开始搜索。"
+    "noSessionActiveContentSearch": "无活动会话。请上传内容以开始搜索。",
+    "vlm": "视觉语言模型",
+    "visualEmbedding": "视觉嵌入模型",
+    "docEmbedding": "文档嵌入模型",
+    "reranker": "重排序模型",
+    "vectorDb": "向量数据库"
+  },
+  "monitoring": {
+    "pausedTitle": "资源监控已暂停",
+    "pausedMessage": "指标轮询已在 {{duration}} 分钟后自动停止。恢复以继续跟踪性能数据。",
+    "resumeAriaLabel": "恢复资源指标轮询",
+    "resumeButton": "恢复"
   },
   "monitoring": {
     "pausedTitle": "资源监控已暂停",
@@ -216,18 +227,25 @@
     "upload": "上传",
     "dragDrop": "将文件拖放到此处",
     "orClick": "或点击选择文件",
-    "supportedTypes": "支持的格式：MP4, PPT, DOCX, PDF, JPG, CSV, TXT",
-    "selectFileToAddTags": "选择一个已上传的文件以添加标签。",
+    "supportedTypes": "支持的文件类型：MP4, JPG, PNG, DOCX...",
+    "maxTotalSize": "最大总大小：500 MB",
+    "selectFileToAddTags": "请选择文件以添加标签。",
     "addTags": "添加标签",
-    "enterTags": "输入以逗号分隔的标签",
+    "enterTags": "输入标签 — 按 Enter 或逗号添加",
+    "pressEnterToAdd": "按 Enter 或逗号添加标签",
+    "clearTags": "清除所有标签",
+    "labelsTitle": "标签",
+    "labelsKey": "标签",
+    "enterTagsPlaceholder": "按 Enter 分隔多个标签，例如 Math\nEnglish",
+    "addToSelected": "添加到选中",
     "fileName": "文件名",
     "size": "大小",
     "type": "类型",
-    "status": "状态",
+    "status": "上传",
     "retry": "重试",
     "clearAll": "清除所有",
     "uploadFiles": "上传文件",
-    "removeFileConfirmation": "您确定要删除此文件吗.继续？",
+    "removeFileConfirmation": "删除此文件将停止处理。继续？",
     "cancel": "取消",
     "remove": "消除",
     "pending": "待处理…",
@@ -235,6 +253,11 @@
     "processing": "处理中…",
     "failed": "失败",
     "uploaded": "已上传 ✓",
+    "summarizing": "摘要生成中...",
+    "summarize": "摘要",
+    "summarized": "摘要完成 ✔",
+    "summaryFailed": "摘要失败",
+    "vsOff": "关闭",
     "alreadyExists": "已存在"
   },
   "searchSection": {
@@ -251,13 +274,15 @@
     "videos": "视频",
     "selectAtLeastOneType": "请至少选择一种类型",
     "filterByLabel": "按标签筛选",
+    "selectLabels": "选择标签...",
     "topResults": "最佳结果：",
     "searching": "正在搜索...",
     "search": "搜索",
     "reset": "重置",
     "searchNotAvailable": "搜索不可用。",
     "filesStillUploading": "文件仍在上传中...",
-    "uploadFilesToEnable": "上传文件以启用搜索。"
+    "uploadFilesToEnable": "上传文件以启用搜索。",
+    "processingBanner": "部分文件仍在处理中。您可以立即搜索，处理完成后结果可能会更多。"
   },
   "resultSection": {
     "title": "结果",
@@ -272,6 +297,7 @@
     "time": "时间：",
     "relevance": "相关性：",
     "labels": "标签",
-    "score": "分数"
+    "score": "分数",
+    "scoreFormat": "分数格式"
   }
 }

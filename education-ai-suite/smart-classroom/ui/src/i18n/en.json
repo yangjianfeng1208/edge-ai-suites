@@ -144,7 +144,12 @@
       "backCamera": "Back",
       "boardCamera": "Board",
       "allCameras": "All",
-      "noSessionActiveContentSearch": "No active session. Upload content to begin searching."
+      "noSessionActiveContentSearch": "No active session. Upload content to begin searching.",
+      "vlm": "VLM",
+      "visualEmbedding": "Visual Embedding",
+      "docEmbedding": "Doc Embedding",
+      "reranker": "Reranker",
+      "vectorDb": "Vector DB"
     },
     "monitoring": {
     "pausedTitle": "Resource Monitoring Paused",
@@ -215,18 +220,25 @@
     "upload":"Upload",
     "dragDrop":"Drag & drop your files here",
     "orClick":"or click to browse",
-    "supportedTypes":"Supported: MP4, PPT, DOCX, PDF, JPG, CSV, TXT",
-    "selectFileToAddTags":"Select an uploaded file to add tags.",
+    "supportedTypes":"Supported file types: MP4, JPG, PNG, DOCX...",
+    "maxTotalSize":"Max total size: 500 MB",
+    "selectFileToAddTags":"To add tags, please select the file.",
     "addTags":"Add Tags",
-    "enterTags":"Enter tags separated by commas",
+    "enterTags":"Add tag — press Enter or comma",
+    "pressEnterToAdd":"Press Enter or comma to add tag",
+    "clearTags":"Clear all tags",
+    "labelsTitle":"Labels",
+    "labelsKey":"Labels",
+    "enterTagsPlaceholder":"Press Enter to separate multiple labels, e.g. Math\nEnglish",
+    "addToSelected":"Add to selected",
     "fileName":"File Name",
     "size":"Size",
     "type":"Type",
-    "status":"Status",
+    "status":"Upload",
     "retry":" ↻ Retry",
     "clearAll":"Clear All",
     "uploadFiles":"Upload Files",
-    "removeFileConfirmation":"Are you sure you want to remove this file. Continue?",
+    "removeFileConfirmation":"Removing this file will stop processing. Continue?",
     "cancel":"Cancel",
     "remove":"Remove",
     "pending":"Pending...",
@@ -234,7 +246,12 @@
     "processing":"Processing...",
     "failed":"Failed",
     "uploaded":"Uploaded ✔",
-    "alreadyExists":"Already Exists"
+    "alreadyExists":"Already Exists",
+    "summarizing":"Summarizing...",
+    "summarize":"Summarization",
+    "summarized":"Summarized ✔",
+    "summaryFailed":"Summary Failed",
+    "vsOff":"Off"
   },
   "searchSection": {
     "title": "Search",
@@ -249,14 +266,16 @@
     "images": "Images",
     "videos": "Videos",
     "selectAtLeastOneType": "Please select at least one type",
-    "filterByLabel": "Filter by labels",
+    "filterByLabel": "Filter by Labels",
+    "selectLabels": "Select labels...",
     "topResults": "Top Results:",
     "searching": "Searching...",
     "search": "Search",
     "reset": "Reset",
     "searchNotAvailable": "Search is not available.",
     "filesStillUploading": "Files are still uploading...",
-    "uploadFilesToEnable": "Upload files to enable search."
+    "uploadFilesToEnable": "Upload files to enable search.",
+    "processingBanner": "Some files are still processing. You can search now; results may expand once processing finishes."
   },
   "resultSection": {
     "title": "Results",
@@ -271,7 +290,8 @@
     "time": "Time:",
     "relevance": "Relevance:",
     "labels": "Labels",
-    "score": "Score"
+    "score": "Score",
+    "scoreFormat": "Score format"
   }
 }
  

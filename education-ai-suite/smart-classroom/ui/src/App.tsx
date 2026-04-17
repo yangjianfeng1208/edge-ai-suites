@@ -19,6 +19,9 @@ const App: React.FC = () => {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [activeScreen, setActiveScreen] = useState<'main' | 'content-search'>('main');
   useVideoPipelineMonitor();
+
+  const mainBackendAvailable = backendStatus === 'available';
+
   const checkBackendHealth = async () => {
     try {
       const isHealthy = await pingBackend();
@@ -55,6 +58,19 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [backendStatus]);
 
+  // Auto-switch to content-search when main backend (main.py) is not running.
+  // This allows using content-search independently without starting main.py.
+  useEffect(() => {
+    if (!mainBackendAvailable && activeScreen === 'main') {
+      setActiveScreen('content-search');
+    }
+  }, [mainBackendAvailable]);
+
+  // Prevent switching to main screen when its backend is unavailable
+  const handleSetActiveScreen = (screen: 'main' | 'content-search') => {
+    if (screen === 'main' && !mainBackendAvailable) return;
+    setActiveScreen(screen);
+  };
 
     if (backendStatus === 'checking') {
     return (
@@ -68,34 +84,21 @@ const App: React.FC = () => {
     );
   }
 
-  if (backendStatus === 'unavailable') {
-    return (
-      <div className="app-error">
-        <div className="error-content">
-          <h1>Backend Not Available</h1>
-          <p>
-            The backend server is currently unreachable.
-            Please ensure it is running.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="app">
-      <MetricsPoller />
+      {mainBackendAvailable && <MetricsPoller />}
       <TopPanel
         projectName={projectName}
         setProjectName={setProjectName}
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
         activeScreen={activeScreen}
-        setActiveScreen={setActiveScreen}
+        setActiveScreen={handleSetActiveScreen}
+        mainBackendAvailable={mainBackendAvailable}
       />
-      <div style={{ display: activeScreen === 'main' ? 'contents' : 'none' }}>
+      {mainBackendAvailable && activeScreen === 'main' && (
         <HeaderBar projectName={projectName} setProjectName={setProjectName} />
-      </div>
+      )}
       {activeScreen === 'content-search' && (
         <div className="content-search-subheader">
           <span>{t('contentSearch.subtitle')}</span>
@@ -106,9 +109,9 @@ const App: React.FC = () => {
       </div>
       <Footer />
       
-      {/* Render modal as portal to document.body using your existing Modal component */}
-      {createPortal(
-        <Modal 
+      {/* Settings modal - only relevant when main backend is running */}
+      {mainBackendAvailable && createPortal(
+        <Modal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           showCloseIcon={true}
