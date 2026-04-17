@@ -531,13 +531,12 @@ const ResultSection: React.FC<ResultSectionProps> = ({ results }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ResultTab>("all");
   const [scoreFormat, setScoreFormat] = useState<ScoreFormat>("percent");
+  const [minScore, setMinScore] = useState(60);
   const [previewResult, setPreviewResult] = useState<SearchResult | null>(
     null
   );
 
   const safeResults = Array.isArray(results) ? results : [];
-
-  const MIN_SCORE = 60;
 
   const filteredResults = useMemo(() => {
     const filtered =
@@ -545,15 +544,27 @@ const ResultSection: React.FC<ResultSectionProps> = ({ results }) => {
         ? safeResults
         : safeResults.filter((r) => r?.meta?.type === activeTab);
     return [...filtered]
-      .filter((r) => (r?.score ?? 0) >= MIN_SCORE)
+      .filter((r) => (r?.score ?? 0) >= minScore)
       .sort((a, b) => (b?.score ?? 0) - (a?.score ?? 0));
-  }, [safeResults, activeTab]);
+  }, [safeResults, activeTab, minScore]);
 
   return (
     <div className="cs-result-card">
       <div className="cs-result-header">
         <span className="cs-result-title">{t("resultSection.title")}</span>
         <div className="cs-result-score-format">
+          <span className="cs-result-score-format-label">{t("resultSection.minScore")}</span>
+          <input
+            className="cs-result-min-score-input"
+            type="number"
+            min={0}
+            max={100}
+            value={minScore}
+            onChange={(e) => {
+              const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+              setMinScore(v);
+            }}
+          />
           <span className="cs-result-score-format-label">{t("resultSection.scoreFormat")}</span>
           <select
             className="cs-result-score-format-select"

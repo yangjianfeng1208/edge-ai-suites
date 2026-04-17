@@ -192,19 +192,6 @@ const UploadFilesModal: React.FC<UploadFilesModalProps> = ({ isOpen, onClose }) 
     dispatch(resetMediaValidation());  // Reset media validation state
     dispatch(startProcessing());
 
-    // Set uploaded video files AFTER reset to preserve them
-    console.log('🎥 Setting uploaded video files in Redux:', {
-      front: frontCameraPath ? frontCameraPath.name : 'null',
-      back: rearCameraPath ? rearCameraPath.name : 'null',
-      board: boardCameraPath ? boardCameraPath.name : 'null'
-    });
-    
-    dispatch(setUploadedVideoFiles({
-      front: frontCameraPath,
-      back: rearCameraPath,
-      board: boardCameraPath,
-    }));
-
     if (hasAudioFile) {
       dispatch(setAudioStatus('processing'));
       console.log('🎯 Audio status set to processing - will show "Analyzing audio..."');

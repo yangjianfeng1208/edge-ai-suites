@@ -291,6 +291,7 @@
     "relevance": "Relevance:",
     "labels": "Labels",
     "score": "Score",
+    "minScore": "Min score",
     "scoreFormat": "Score format"
   }
 }

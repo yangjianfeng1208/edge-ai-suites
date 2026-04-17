@@ -37,6 +37,22 @@
   white-space: nowrap;
 }
 
+.cs-result-min-score-input {
+  width: 48px;
+  padding: 4px 6px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cs-result-min-score-input:focus {
+  border-color: #1976d2;
+}
+
 .cs-result-score-format-select {
   padding: 4px 8px;
   border: 1px solid #d0d0d0;

@@ -298,6 +298,7 @@
     "relevance": "相关性：",
     "labels": "标签",
     "score": "分数",
+    "minScore": "最低分",
     "scoreFormat": "分数格式"
   }
 }

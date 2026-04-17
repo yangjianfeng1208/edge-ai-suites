@@ -88,6 +88,7 @@ const HLSPlayer: React.FC<Props> = ({ streamUrl, videoFile, mode, camera }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
   const highlightComponentRef = useRef<TimelineHighlights | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   const [duration, setDuration] = useState(0);
   const [highlights, setHighlights] = useState<TimelineHighlight[]>([]);
@@ -126,6 +127,10 @@ const HLSPlayer: React.FC<Props> = ({ streamUrl, videoFile, mode, camera }) => {
   /* ---------- CLEANUP ---------- */
 
   const cleanup = () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
     if (playerRef.current) {
       try {
         if (!playerRef.current.isDisposed()) {
@@ -162,7 +167,9 @@ const HLSPlayer: React.FC<Props> = ({ streamUrl, videoFile, mode, camera }) => {
       playbackRates: [0.5, 1, 1.25, 1.5, 2],
     });
 
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     const url = URL.createObjectURL(videoFile);
+    blobUrlRef.current = url;
     playerRef.current.src({ src: url, type: videoFile.type });
 
     playerRef.current.ready(() => {

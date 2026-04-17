@@ -64,7 +64,7 @@ const App: React.FC = () => {
     if (!mainBackendAvailable && activeScreen === 'main') {
       setActiveScreen('content-search');
     }
-  }, [mainBackendAvailable]);
+  }, [mainBackendAvailable, activeScreen]);
 
   // Prevent switching to main screen when its backend is unavailable
   const handleSetActiveScreen = (screen: 'main' | 'content-search') => {

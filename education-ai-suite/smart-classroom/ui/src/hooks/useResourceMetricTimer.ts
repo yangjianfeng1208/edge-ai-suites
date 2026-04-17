@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { setMonitoringActive, setMonitoringPaused } from '../redux/slices/uiSlice';
 import { startMonitoring, stopMonitoring } from '../services/api';
@@ -13,6 +13,8 @@ export function useResourceMetricTimer() {
   const dispatch = useAppDispatch();
   const monitoringActive = useAppSelector((s) => s.ui.monitoringActive);
   const sessionId = useAppSelector((s) => s.ui.sessionId);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const timerRef = useRef<number | null>(null);
 
   const clearTimer = () => {
@@ -41,16 +43,17 @@ export function useResourceMetricTimer() {
     return clearTimer;
   }, [monitoringActive, dispatch]);
 
-  const resumeMonitoring = async () => {
-    if (!sessionId) return;
+  const resumeMonitoring = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
     try {
-      await startMonitoring(sessionId);
+      await startMonitoring(sid);
       dispatch(setMonitoringPaused(false));
       dispatch(setMonitoringActive(true));
     } catch (e) {
       console.error('Failed to resume resource metric monitoring:', e);
     }
-  };
+  }, [dispatch]);
 
   return { resumeMonitoring };
 }
