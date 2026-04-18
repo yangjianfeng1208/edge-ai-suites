@@ -93,18 +93,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ projectName }) => {
 
   useEffect(() => {
     dispatch(loadCameraSettingsFromStorage());
-    const stopExistingMonitoring = async () => {
-    try {
-        console.log('🔄 Stopping any existing monitoring on component mount...');
-        await stopMonitoring();
-        dispatch(setMonitoringActive(false));
-        console.log('✅ Existing monitoring stopped successfully');
-      } catch (error) {
-        console.log('ℹ️ No existing monitoring to stop (this is normal):', error);
-        dispatch(setMonitoringActive(false));
-      }
-    };
-    stopExistingMonitoring();
     
     const checkAudioDevices = async () => {
       try {

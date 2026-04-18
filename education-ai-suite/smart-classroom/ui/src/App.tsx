@@ -8,16 +8,20 @@ import Modal from './components/Modals/Modal'; // Import your existing Modal
 import SettingsForm from './components/Modals/SettingsForm'; // Import your existing SettingsForm
 import './App.css';
 import MetricsPoller from './components/common/MetricsPoller';
-import { getSettings, pingBackend } from './services/api';
+import { getSettings, pingBackend, stopMonitoring } from './services/api';
 import { useVideoPipelineMonitor } from "../src/redux/videoMonitor";
 import { useTranslation } from 'react-i18next';
-  
+import { useAppDispatch } from './redux/hooks';
+import { setMonitoringActive } from './redux/slices/uiSlice';
+
 const App: React.FC = () => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const [projectName, setProjectName] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [activeScreen, setActiveScreen] = useState<'main' | 'content-search'>('main');
+  const monitoringCleanupDone = useRef(false);
   useVideoPipelineMonitor();
 
   const mainBackendAvailable = backendStatus === 'available';
@@ -48,8 +52,28 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    checkBackendHealth(); 
+    checkBackendHealth();
   }, []);
+
+  // Stop any existing monitoring on app initialization (only once)
+  useEffect(() => {
+    if (monitoringCleanupDone.current || !mainBackendAvailable) return;
+
+    const stopExistingMonitoring = async () => {
+      try {
+        console.log('🔄 Stopping any existing monitoring on app initialization...');
+        await stopMonitoring();
+        dispatch(setMonitoringActive(false));
+        console.log('✅ Existing monitoring stopped successfully');
+      } catch (error) {
+        console.log('ℹ️ No existing monitoring to stop (this is normal):', error);
+        dispatch(setMonitoringActive(false));
+      }
+      monitoringCleanupDone.current = true;
+    };
+
+    stopExistingMonitoring();
+  }, [mainBackendAvailable, dispatch]);
 
   useEffect(() => {
     if (backendStatus === 'available') return;
