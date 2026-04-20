@@ -86,6 +86,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ projectName }) => {
   const hasAudioDevices = useAppSelector((s) => s.ui.hasAudioDevices);
   const audioDevicesLoading = useAppSelector((s) => s.ui.audioDevicesLoading);
   const isRecording = useAppSelector((s) => s.ui.isRecording);
+  const recordingStartTime = useAppSelector((s) => s.ui.recordingStartTime);
   const justStoppedRecording = useAppSelector((s) => s.ui.justStoppedRecording);
   const hasUploadedVideoFiles = useAppSelector((s) => s.ui.hasUploadedVideoFiles);
   const isPlaybackMode = useAppSelector((s) => s.ui.videoPlaybackMode);
@@ -148,24 +149,20 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ projectName }) => {
 
   const handleClose = () => setShowToast(false);
 
+  // Drive the timer from the Redux-persisted start timestamp so it survives
+  // the HeaderBar unmount/remount that happens when switching to
+  // content-search and back.
   useEffect(() => {
-    let interval: number | undefined;
-    const shouldRunTimer = isRecording;
-
-    if (shouldRunTimer) {
-      interval = window.setInterval(() => setTimer((t) => t + 1), 1000);
-    } else if (interval) {
-      clearInterval(interval);
-    }
-
-    return () => clearInterval(interval);
-  }, [isRecording]);
-
-  useEffect(() => {
-    if (processingMode && processingMode !== 'microphone') {
+    if (!isRecording || !recordingStartTime) {
       setTimer(0);
+      return;
     }
-  }, [processingMode]);
+
+    const tick = () => setTimer(Math.floor((Date.now() - recordingStartTime) / 1000));
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isRecording, recordingStartTime]);
 
   const hasVideoCapability = useMemo(() => {
     const hasCameraSettings = Boolean(

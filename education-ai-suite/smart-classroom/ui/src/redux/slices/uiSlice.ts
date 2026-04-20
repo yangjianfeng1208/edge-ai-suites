@@ -48,6 +48,7 @@ export interface UIState {
   justStoppedRecording: boolean;
   videoAnalyticsStopping: boolean;
   hasUploadedVideoFiles: boolean;
+  recordingStartTime: number | null;
   monitoringActive: boolean;
   monitoringPaused: boolean;
   videoPlaybackMode: boolean;
@@ -113,6 +114,7 @@ const initialState: UIState = {
   justStoppedRecording: false,
   videoAnalyticsStopping: false,
   hasUploadedVideoFiles: false,
+  recordingStartTime: null,
   monitoringActive: false,
   monitoringPaused: false,
   videoPlaybackMode: false,
@@ -348,6 +350,18 @@ const uiSlice = createSlice({
     },
 
     loadCameraSettingsFromStorage(state) {
+      // Preserve in-flight or terminal states so remounting the header
+      // (e.g. after switching back from content-search) doesn't wipe out
+      // active playback or a running pipeline.
+      if (
+        state.videoStatus === 'completed' ||
+        state.videoStatus === 'failed' ||
+        state.videoStatus === 'streaming' ||
+        state.videoStatus === 'starting' ||
+        state.videoStatus === 'stopping'
+      ) {
+        return;
+      }
       const hasVideoConfig = Boolean(
         state.frontCamera?.trim() ||
         state.backCamera?.trim() ||
@@ -366,6 +380,19 @@ const uiSlice = createSlice({
 
     setHasAudioDevices(state, action: PayloadAction<boolean>) {
       state.hasAudioDevices = action.payload;
+      // Don't clobber an in-flight or terminal audio status — remounting
+      // the header (after switching back from content-search) re-runs the
+      // audio device probe and must not reset processing state.
+      const preserved: AudioStatus[] = [
+        'recording',
+        'processing',
+        'transcribing',
+        'summarizing',
+        'mindmapping',
+        'complete',
+        'error',
+      ];
+      if (preserved.includes(state.audioStatus)) return;
       state.audioStatus = action.payload ? 'ready' : 'no-devices';
     },
 
@@ -380,6 +407,7 @@ const uiSlice = createSlice({
       state.isRecording = action.payload;
       if (action.payload) {
         state.justStoppedRecording = false;
+        state.recordingStartTime = Date.now();
         if (state.hasAudioDevices) {
           state.audioStatus = 'recording';
         }
@@ -388,6 +416,7 @@ const uiSlice = createSlice({
         }
       } else {
         state.justStoppedRecording = true;
+        state.recordingStartTime = null;
       }
     },
 
