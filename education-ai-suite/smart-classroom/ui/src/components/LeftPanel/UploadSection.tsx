@@ -341,8 +341,15 @@ const UploadSection: React.FC = () => {
           } else {
             const res = await csUploadIngest(entry.file, Object.keys(meta).length ? meta : undefined);
             if (res.status === "ALREADY_EXISTS") {
-              // File was already fully processed in a previous session — no new task created
-              updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100 });
+              // File was already fully processed in a previous session. Keep
+              // the prior task_id so the user can trigger cleanup by removing
+              // this row.
+              updateEntry(entry.id, {
+                status: "ALREADY_EXISTS",
+                progress: 100,
+                taskId: res.task_id || null,
+                fileKey: res.file_key ?? null,
+              });
             } else {
               updateEntry(entry.id, { taskId: res.task_id, status: "PROCESSING", fileKey: res.file_key ?? null });
               startPolling(entry.id, res.task_id);
@@ -367,8 +374,14 @@ const UploadSection: React.FC = () => {
         if (entry.isVideo) meta.vs_enabled = entry.vsEnabled;
         const res = await csUploadIngest(entry.file, Object.keys(meta).length ? meta : undefined);
         if (res.status === "ALREADY_EXISTS") {
-          // Already fully processed — no new background task, treat as terminal
-          updateEntry(entry.id, { status: "ALREADY_EXISTS", progress: 100 });
+          // Already fully processed — reuse the prior task_id so removal
+          // can trigger cleanup of the stored file and embeddings.
+          updateEntry(entry.id, {
+            status: "ALREADY_EXISTS",
+            progress: 100,
+            taskId: res.task_id || null,
+            fileKey: res.file_key ?? null,
+          });
         } else {
           updateEntry(entry.id, { taskId: res.task_id, status: "PROCESSING", fileKey: res.file_key ?? null });
           startPolling(entry.id, res.task_id);
