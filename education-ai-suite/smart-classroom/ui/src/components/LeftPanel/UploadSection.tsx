@@ -48,6 +48,10 @@ function formatSize(bytes: number): string {
 const ALLOWED_EXTENSIONS = new Set([".mp4", ".ppt", ".pptx", ".docx", ".pdf", ".jpg", ".jpeg", ".csv", ".txt"]);
 const VIDEO_EXTENSIONS = new Set([".mp4", ".avi", ".mov", ".mkv"]);
 
+// Per-file size caps. Must stay in sync with content_search/utils/asset_service.py.
+const DOCUMENT_MAX_BYTES = 100 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 1024 * 1024 * 1024;
+
 function isAllowed(filename: string): boolean {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
   return ALLOWED_EXTENSIONS.has(ext);
@@ -56,6 +60,10 @@ function isAllowed(filename: string): boolean {
 function isVideoFile(filename: string): boolean {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
   return VIDEO_EXTENSIONS.has(ext);
+}
+
+function maxBytesFor(filename: string): number {
+  return isVideoFile(filename) ? VIDEO_MAX_BYTES : DOCUMENT_MAX_BYTES;
 }
 
 const TERMINAL: TaskStatus[] = ["COMPLETED", "FAILED", "ALREADY_EXISTS"];
@@ -76,6 +84,7 @@ const UploadSection: React.FC = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [summarizationEnabled, setSummarizationEnabled] = useState(false);
+  const [sizeError, setSizeError] = useState<string | null>(null);
 
   useEffect(() => {
     csGetConfig().then((cfg) => {
@@ -217,10 +226,34 @@ const UploadSection: React.FC = () => {
   // Stage files locally — upload is triggered explicitly by the user
   const processFiles = useCallback(
     (files: File[]) => {
+      // Reject anything over the per-type size cap up front so the user
+      // doesn't wait on an upload that the backend will reject with 413.
+      const tooLarge: string[] = [];
+      const accepted: File[] = [];
+      for (const f of files) {
+        if (f.size > maxBytesFor(f.name)) {
+          const limitMb = maxBytesFor(f.name) / (1024 * 1024);
+          tooLarge.push(`${f.name} (${formatSize(f.size)}, max ${limitMb} MB)`);
+        } else {
+          accepted.push(f);
+        }
+      }
+      if (tooLarge.length > 0) {
+        setSizeError(
+          t(
+            "uploadSection.fileTooLarge",
+            "File too large — skipped:\n"
+          ) + tooLarge.join("\n")
+        );
+      } else {
+        setSizeError(null);
+      }
+      if (accepted.length === 0) return;
+
       setEntries((prev) => {
         // Deduplicate by filename + size against existing entries
         const existingKeys = new Set(prev.map((e) => `${e.filename}|${e.fileSize}`));
-        const unique = files.filter((f) => !existingKeys.has(`${f.name}|${f.size}`));
+        const unique = accepted.filter((f) => !existingKeys.has(`${f.name}|${f.size}`));
         if (unique.length === 0) return prev;
 
         const newEntries: UploadEntry[] = unique.map((f) => ({
@@ -243,7 +276,7 @@ const UploadSection: React.FC = () => {
         return [...prev, ...newEntries];
       });
     },
-    []
+    [t]
   );
 
   // Upload all staged files (with their tags) when user clicks the Upload button
@@ -440,7 +473,12 @@ return (
       </div>
 
       <p className="cs-supported-types">{t("uploadSection.supportedTypes")}</p>
-      <p className="cs-max-size-hint">{t("uploadSection.maxTotalSize", "Max total size: 500 MB")}</p>
+      <p className="cs-max-size-hint">{t("uploadSection.maxFileSize", "Max file size: 100 MB (documents), 1 GB (videos)")}</p>
+      {sizeError && (
+        <p className="cs-max-size-hint" style={{ color: "#c0392b", whiteSpace: "pre-line" }}>
+          {sizeError}
+        </p>
+      )}
 
       <input
         ref={fileInputRef}

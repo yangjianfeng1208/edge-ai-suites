@@ -229,6 +229,8 @@
     "orClick": "或点击选择文件",
     "supportedTypes": "支持的文件类型：MP4, JPG, PNG, DOCX...",
     "maxTotalSize": "最大总大小：500 MB",
+    "maxFileSize": "单个文件最大：文档 100 MB，视频 1 GB",
+    "fileTooLarge": "文件过大，已跳过：\n",
     "selectFileToAddTags": "请选择文件以添加标签。",
     "addTags": "添加标签",
     "enterTags": "输入标签 — 按 Enter 或逗号添加",

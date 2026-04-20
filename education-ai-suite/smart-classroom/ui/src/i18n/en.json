@@ -222,6 +222,8 @@
     "orClick":"or click to browse",
     "supportedTypes":"Supported file types: MP4, JPG, PNG, DOCX...",
     "maxTotalSize":"Max total size: 500 MB",
+    "maxFileSize":"Max file size: 100 MB per document, 1 GB per video",
+    "fileTooLarge":"File too large — skipped:\n",
     "selectFileToAddTags":"To add tags, please select the file.",
     "addTags":"Add Tags",
     "enterTags":"Add tag — press Enter or comma",
