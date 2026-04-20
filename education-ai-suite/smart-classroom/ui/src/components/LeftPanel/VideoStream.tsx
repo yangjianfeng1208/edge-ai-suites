@@ -97,8 +97,10 @@ const VideoStream: React.FC<VideoStreamProps> = ({
     transcriptStatus === "streaming" ||
     videoAnalyticsActive;
 
+  const videoPlaybackMode = useAppSelector((s) => s.ui.videoPlaybackMode);
+
   const isPlaybackMode = Boolean(
-    videoStatus === "completed" &&
+    (videoStatus === "completed" || videoPlaybackMode) &&
     (uploadedVideoFiles.front ||
      uploadedVideoFiles.back ||
      uploadedVideoFiles.board ||

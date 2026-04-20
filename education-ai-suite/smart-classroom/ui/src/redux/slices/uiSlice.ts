@@ -340,8 +340,10 @@ const uiSlice = createSlice({
       if (action.payload) {
         state.videoStatus = 'streaming';
         state.videoAnalyticsLoading = false;
-      } else if (!state.videoAnalyticsLoading && state.videoStatus !== 'completed') {
-        state.videoStatus = 'ready';
+      } else if (!state.videoAnalyticsLoading && state.videoStatus !== 'completed' && state.videoStatus !== 'failed') {
+        if (!state.videoPlaybackMode) {
+          state.videoStatus = 'ready';
+        }
       }
     },
 
@@ -399,7 +401,13 @@ const uiSlice = createSlice({
     setAudioDevicesLoading(state, action: PayloadAction<boolean>) {
       state.audioDevicesLoading = action.payload;
       if (action.payload) {
-        state.audioStatus = 'checking';
+        const preservedAudio: AudioStatus[] = [
+          'recording', 'processing', 'transcribing',
+          'summarizing', 'mindmapping', 'complete', 'error',
+        ];
+        if (!preservedAudio.includes(state.audioStatus)) {
+          state.audioStatus = 'checking';
+        }
       }
     },
 
