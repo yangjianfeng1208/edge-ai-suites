@@ -179,13 +179,12 @@ const PdfThumbnail: React.FC<{ url: string; pageNum: number }> = ({
     (async () => {
       try {
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).href;
 
-        const pdf = await pdfjsLib.getDocument({
-          url,
-          disableAutoFetch: true,
-          disableStream: true,
-        }).promise;
+        const pdf = await pdfjsLib.getDocument(url).promise;
         if (cancelled) return;
         const safePage = Math.min(Math.max(1, pageNum), pdf.numPages);
         const page = await pdf.getPage(safePage);
