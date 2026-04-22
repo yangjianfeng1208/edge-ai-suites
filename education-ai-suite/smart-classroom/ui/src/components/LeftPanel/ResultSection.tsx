@@ -165,16 +165,28 @@ const PdfThumbnail: React.FC<{ url: string; pageNum: number }> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled && !loaded) {
+        cancelled = true;
+        setFailed(true);
+      }
+    }, 10000);
 
     (async () => {
       try {
         const pdfjsLib = await import("pdfjs-dist");
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-        const pdf = await pdfjsLib.getDocument(url).promise;
+        const pdf = await pdfjsLib.getDocument({
+          url,
+          disableAutoFetch: true,
+          disableStream: true,
+        }).promise;
+        if (cancelled) return;
         const safePage = Math.min(Math.max(1, pageNum), pdf.numPages);
         const page = await pdf.getPage(safePage);
         const vp = page.getViewport({ scale: 1 });
@@ -188,16 +200,23 @@ const PdfThumbnail: React.FC<{ url: string; pageNum: number }> = ({
         const ctx = canvas.getContext("2d");
         if (ctx)
           await page.render({ canvasContext: ctx, viewport: scaled }).promise;
-        if (!cancelled) setLoaded(true);
+        if (!cancelled) {
+          clearTimeout(timer);
+          setLoaded(true);
+        }
       } catch (err) {
         console.warn("PDF thumbnail failed:", err);
+        if (!cancelled) setFailed(true);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [url, pageNum]);
+
+  if (failed) return <FileTypeBadge filename="document.pdf" />;
 
   return (
     <>
