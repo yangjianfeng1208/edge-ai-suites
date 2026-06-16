@@ -1,6 +1,23 @@
-paddleocr>=2.7.0
+# OCR Dependencies
+paddleocr==2.10.0
+paddlepaddle==3.3.1
 opencv-python>=4.8.0
 numpy>=1.24.0
+pyclipper
+
+# Basic Dependencies
 requests>=2.31.0
 Pillow>=10.0.0
 pyyaml>=6.0
+
+# VLM Dependencies (Qwen3.5-9B with OpenVINO)
+git+https://github.com/huggingface/optimum-intel.git
+torchvision
+transformers>=4.45,<5.1
+openvino
+openvino-tokenizers
+openvino-genai
+
+# FastAPI for VLM API Server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0

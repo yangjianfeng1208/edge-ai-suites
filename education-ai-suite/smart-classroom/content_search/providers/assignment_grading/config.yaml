@@ -38,4 +38,4 @@ ocr_config:
   det_db_thresh: 0.3
   rec_image_shape: '3,48,320'
 
-concurrent_workers: 4
+concurrent_workers: 1
