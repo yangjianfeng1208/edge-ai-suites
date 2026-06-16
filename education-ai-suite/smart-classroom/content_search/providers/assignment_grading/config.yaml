@@ -1,0 +1,41 @@
+subject: "Math"
+
+question_type_map:
+  1: choice
+  2: choice
+  3: choice
+  4: choice
+  5: choice
+  6: choice
+  7: blank
+  8: blank
+  9: blank
+  10: blank
+  11: blank
+  12: blank
+  13: blank
+  14: blank
+  15: blank
+  16: blank
+  17: blank
+  18: blank
+  19: calculation
+  20: calculation
+  21: calculation
+  22: calculation
+  23: calculation
+  24: calculation
+  25: calculation
+
+vlm_service:
+  base_url: "http://127.0.0.1:9900"
+  timeout: 30
+  max_retries: 2
+
+ocr_config:
+  lang: 'ch'
+  use_gpu: false
+  det_db_thresh: 0.3
+  rec_image_shape: '3,48,320'
+
+concurrent_workers: 4
