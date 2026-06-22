@@ -1,0 +1,21 @@
+{
+  "question_id": "Q1_4",
+  "question_text": "默写古诗文名句（第4空）",
+  "total_score": 1.5,
+  "question_type": "fill_in_blank_recitation",
+  "criteria": [
+    {
+      "description": "正确默写",
+      "score": 1.5,
+      "requirements": [
+        "答案必须是：先天下之忧而忧，后天下之乐而乐",
+        "全字精确匹配",
+        "逗号可忽略"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "先天下之忧而忧，后天下之乐而乐",
+    "先天下之忧而忧 后天下之乐而乐"
+  ]
+}

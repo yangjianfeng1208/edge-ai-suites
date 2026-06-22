@@ -1,0 +1,20 @@
+{
+  "question_id": "Q2_1",
+  "question_text": "文学常识：《陋室铭》作者",
+  "total_score": 2,
+  "question_type": "literary_common_sense",
+  "criteria": [
+    {
+      "description": "正确填写作者",
+      "score": 2,
+      "requirements": [
+        "答案：刘禹锡",
+        "也接受：刘梦得（其字）"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "刘禹锡",
+    "刘梦得"
+  ]
+}

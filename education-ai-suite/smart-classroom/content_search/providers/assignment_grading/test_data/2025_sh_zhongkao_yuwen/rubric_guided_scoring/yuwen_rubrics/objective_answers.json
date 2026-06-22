@@ -1,0 +1,100 @@
+{
+  "description": "客观题标准答案 - 用于 OCR + 规则匹配，不调用 LLM",
+  "questions": [
+    {
+      "question_id": "Q1",
+      "type": "fill_in_blank_recitation",
+      "total_score": 13,
+      "answers": [
+        {"slot": "1.1", "score": 2, "answer": "阴阳割昏晓", "tolerance": "全字精确匹配"},
+        {"slot": "1.2", "score": 2, "answer": "飞鸟相与还", "tolerance": "全字精确匹配"},
+        {"slot": "1.3", "score": 2, "answer": "稻花香里说丰年", "tolerance": "全字精确匹配"},
+        {"slot": "1.4a", "score": 1.5, "answer": "先天下之忧而忧", "tolerance": "全字精确匹配"},
+        {"slot": "1.4b", "score": 1.5, "answer": "后天下之乐而乐", "tolerance": "全字精确匹配"}
+      ],
+      "rules": "错 1 字扣 1 分；漏字、错字、添字均不得分；位置错误（写错小题）0 分"
+    },
+    {
+      "question_id": "Q2",
+      "type": "literary_common_sense",
+      "total_score": 2,
+      "answer": "刘禹锡",
+      "accept_variants": ["刘禹锡", "刘梦得"],
+      "rules": "写对得 2 分；写'刘梦得'（其字）得 2 分；其他 0 分"
+    },
+    {
+      "question_id": "Q3",
+      "type": "word_meaning_multiple_choice",
+      "total_score": 4,
+      "sub_questions": [
+        {"slot": "3.1", "score": 2, "answer": "B", "explanation": "素：不加装饰的"},
+        {"slot": "3.2", "score": 2, "answer": "B", "explanation": "道：说"}
+      ]
+    },
+    {
+      "question_id": "Q4",
+      "type": "grammar_multiple_choice",
+      "total_score": 2,
+      "answer": "D",
+      "explanation": "'乱'和'劳'均为使动用法（使……乱 / 使……劳）",
+      "alternative_view": "部分来源认为考'之'字主谓间取独，但主流答案以使动用法为准",
+      "needs_verification": true
+    },
+    {
+      "question_id": "Q6",
+      "type": "theme_multiple_choice",
+      "total_score": 2,
+      "answer": "D",
+      "explanation": "'一箪食，一瓢饮...回也不改其乐'体现安贫乐道，契合《陋室铭》主旨"
+    },
+    {
+      "question_id": "Q7",
+      "type": "comprehension_multiple_choice",
+      "total_score": 2,
+      "answer": "A",
+      "explanation": "乙文反复用'无非吾德…'句式论证德行对陋室的升华作用，体现逻辑严密"
+    },
+    {
+      "question_id": "Q9",
+      "type": "character_relation_multiple_choice",
+      "total_score": 2,
+      "answer": "B",
+      "explanation": "陈玉禾是福广老汉之子（父子）；福广老汉与福胜老汉同宗同辈（远亲）"
+    },
+    {
+      "question_id": "Q13",
+      "type": "conjunction_multiple_choice",
+      "total_score": 2,
+      "answer": "C",
+      "explanation": "前后并列递进关系，用'也'"
+    },
+    {
+      "question_id": "Q14",
+      "type": "news_analysis_multiple_choice",
+      "total_score": 3,
+      "answer": "B",
+      "explanation": "材料一并非按时间顺序，开头是接收返还事件"
+    },
+    {
+      "question_id": "Q15",
+      "type": "reader_need_multiple_choice",
+      "total_score": 3,
+      "answer": "C",
+      "explanation": "材料二大量篇幅描述机场运输细节"
+    },
+    {
+      "question_id": "Q17",
+      "type": "resource_selection_multiple_choice",
+      "total_score": 2,
+      "answer": "B",
+      "explanation": "古籍图本解析最适合了解'子弹库帛书'主题"
+    },
+    {
+      "question_id": "Q18",
+      "type": "sequence_multiple_choice",
+      "total_score": 2,
+      "answer": "D",
+      "explanation": "时间逻辑：盗墓发现 → 蔡季襄收藏 → 美国人骗走 → 2025 回归（③②①④）"
+    }
+  ]
+}

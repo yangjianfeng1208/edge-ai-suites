@@ -1,0 +1,20 @@
+{
+  "question_id": "Q1_2",
+  "question_text": "默写古诗文名句（第2空）",
+  "total_score": 2,
+  "question_type": "fill_in_blank_recitation",
+  "criteria": [
+    {
+      "description": "正确默写",
+      "score": 2,
+      "requirements": [
+        "答案必须是：飞鸟相与还",
+        "全字精确匹配，不能有错字、漏字、添字",
+        "错1字扣1分"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "飞鸟相与还"
+  ]
+}

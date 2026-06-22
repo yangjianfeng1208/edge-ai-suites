@@ -1,0 +1,20 @@
+{
+  "exam_id": "2025_shanghai_zhongkao_yuwen",
+  "exam_name": "2025年上海市初中学业水平考试语文试卷",
+  "total_score": 150,
+  "duration_minutes": 100,
+  "sections": [
+    {"section_id": "S1", "name": "文言文阅读", "score": 36, "questions": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"]},
+    {"section_id": "S2", "name": "现代文阅读", "score": 34, "questions": ["Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16"]},
+    {"section_id": "S3", "name": "综合运用", "score": 20, "questions": ["Q17", "Q18", "Q19", "Q20"]},
+    {"section_id": "S4", "name": "写作", "score": 60, "questions": ["Q21"]}
+  ],
+  "objective_questions": ["Q1", "Q2", "Q3", "Q4", "Q6", "Q7", "Q9", "Q13", "Q14", "Q15", "Q17", "Q18"],
+  "subjective_questions": ["Q5", "Q8", "Q10", "Q11", "Q12", "Q16", "Q19", "Q20", "Q21"],
+  "rubric_version": "v1.0",
+  "data_sources": [
+    "https://www.renrendoc.com/paper/433079932.html",
+    "https://zy.21cnjy.com/23234426",
+    "https://www.scribd.com/document/1008080430/"
+  ]
+}

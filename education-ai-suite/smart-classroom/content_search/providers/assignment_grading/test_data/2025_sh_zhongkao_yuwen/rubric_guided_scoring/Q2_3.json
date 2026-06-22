@@ -1,0 +1,21 @@
+{
+  "question_id": "Q2_3",
+  "question_text": "【请填写Q2_3的题目内容】",
+  "total_score": 1,
+  "question_type": "multiple_choice",
+  "criteria": [
+    {
+      "description": "答案正确",
+      "score": 1,
+      "requirements": [
+        "【请填写评分要求】"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "【请填写参考答案】"
+  ],
+  "common_mistakes": [
+    "【可选：常见错误】"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "question_id": "Q1_1",
+  "question_text": "默写古诗文名句：造化钟神秀，__________。",
+  "total_score": 1,
+  "question_type": "fill_in_blank_recitation",
+  "criteria": [
+    {
+      "description": "正确默写",
+      "score": 1,
+      "requirements": [
+        "答案为：阴阳割昏晓",
+        "不能有错别字",
+        "标点符号可以不计"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "阴阳割昏晓"
+  ],
+  "common_mistakes": [
+    "阴阳割昏晓（错字：阴写成阴）",
+    "阴阳隔昏晓（错字：割写成隔）"
+  ]
+}

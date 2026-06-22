@@ -1,0 +1,19 @@
+{
+  "question_id": "Q3_1",
+  "question_text": "选择题：'素'字含义",
+  "total_score": 2,
+  "question_type": "word_meaning_multiple_choice",
+  "criteria": [
+    {
+      "description": "选择正确答案",
+      "score": 2,
+      "requirements": [
+        "答案：B",
+        "解释：素=不加装饰的"
+      ]
+    }
+  ],
+  "reference_answers": [
+    "B"
+  ]
+}
