@@ -6,14 +6,6 @@ BASE_DIR = Path(__file__).parent
 
 
 def process_adjusted_detections(detection_json, output_dir):
-    """
-    处理调整后的YOLO检测结果：
-    1. 读取检测框
-    2. 裁剪答题区域
-    3. OCR识别
-    4. 匹配题号
-    5. 输出VLM评分输入
-    """
     print(f"\n{'='*80}")
     print("处理调整后的YOLO检测结果")
     print(f"{'='*80}")

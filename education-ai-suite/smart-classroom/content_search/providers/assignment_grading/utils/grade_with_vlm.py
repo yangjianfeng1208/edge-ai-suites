@@ -1,8 +1,7 @@
 import json
 from pathlib import Path
 import base64
-
-BASE_DIR = Path(__file__).parent
+import re
 
 
 def encode_image_to_base64(image_path):
@@ -11,10 +10,6 @@ def encode_image_to_base64(image_path):
 
 
 def load_rubric(rubric_dir, question_id):
-    """
-    加载评分标准
-    假设rubric文件命名为: Q1.json, Q2.json 等
-    """
     rubric_file = rubric_dir / f"{question_id}.json"
 
     if not rubric_file.exists():
@@ -28,9 +23,6 @@ def load_rubric(rubric_dir, question_id):
 
 
 def construct_vlm_prompt(question_id, rubric, answer_image_path):
-    """
-    构造VLM评分的prompt
-    """
     if not rubric:
         return {
             'error': 'no_rubric',
@@ -40,10 +32,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
 
     max_score = rubric.get('total_score', 0)
 
-    prompt = f"""批改中考试卷。
-
-题目：{rubric.get('question_text', '见图片')}
-"""
+    prompt = f"批改中考试卷。\n\n题目：{rubric.get('question_text', '见图片')}\n"
 
     context = rubric.get('context', {})
     if context:
@@ -81,14 +70,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
             score = example.get('score', 0)
             prompt += f"\n学生答：{ans[:50]}... → 得分：{score}分"
 
-    prompt += f"""
-
-查看图片中学生的手写答案并打分。
-
-直接输出（不要任何其他内容）：
-得分：X/{max_score}
-理由：简要说明
-"""
+    prompt += f"\n\n查看图片中学生的手写答案并打分。\n\n直接输出（不要任何其他内容）：\n得分：X/{max_score}\n理由：简要说明\n"
 
     image_base64 = encode_image_to_base64(answer_image_path)
 
@@ -101,22 +83,6 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
 
 
 def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
-    """
-    调用本地VLM API进行评分
-    """
-    import requests
-
-    if model == 'mock':
-        result = {
-            'total_score': 0,
-            'max_score': 0,
-            'breakdown': [],
-            'comment': '(Mock模式，示例输出)',
-            'model': model,
-            'mock': True
-        }
-        return result
-
     print(f"    调用本地VLM: {api_url}")
 
     payload = {
@@ -147,6 +113,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
     }
 
     try:
+        import requests
         response = requests.post(
             f"{api_url}/v1/chat/completions",
             json=payload,
@@ -162,8 +129,6 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
         print(f"    {'-'*60}")
         print(f"    {vlm_output[:500]}..." if len(vlm_output) > 500 else vlm_output)
         print(f"    {'-'*60}\n")
-
-        import re
 
         last_500_chars = vlm_output[-500:] if len(vlm_output) > 500 else vlm_output
 
@@ -191,7 +156,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
                     break
 
             if total_score is None:
-                print(f"    ⚠️ 未找到得分信息，默认给0分")
+                print(f"     未找到得分信息，默认给0分")
                 result = {
                     'total_score': 0,
                     'max_score': vlm_input.get('max_score', 0),
@@ -210,31 +175,25 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
             'comment': reason,
             'raw_output': vlm_output
         }
-        print(f"    ✅ 解析成功：{total_score}/{max_score}分")
-
-        result['model'] = model
-        result['api_url'] = api_url
+        print(f"     解析成功：{total_score}/{max_score}分")
 
         return result
 
     except Exception as e:
-        print(f"\n    ❌ VLM调用异常: {e}")
+        print(f"\n     VLM调用异常: {e}")
         import traceback
         traceback.print_exc()
         return {
             'total_score': 0,
             'max_score': 0,
-            'breakdown': [],
             'comment': f'VLM调用错误: {str(e)}',
             'error': str(e),
-            'model': model
+            'model': model,
+            'raw_output': ''
         }
 
 
 def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', api_url='http://127.0.0.1:9900'):
-    """
-    使用VLM评分
-    """
     print(f"\n{'='*80}")
     print("VLM自动评分")
     print(f"{'='*80}")
@@ -242,35 +201,38 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
 
     print(f"\n[1/4] 加载学生答案...")
     with open(processed_json, 'r', encoding='utf-8') as f:
-        answer_data = json.load(f)
+        processed_data = json.load(f)
 
-    student_id = answer_data['student_id']
-    answer_blocks = answer_data['answer_blocks']
+    student_id = processed_data.get('student_id', 'unknown')
+    answer_blocks = processed_data.get('answer_blocks', [])
 
     print(f"  学生ID: {student_id}")
     print(f"  答题数: {len(answer_blocks)}")
 
     print(f"\n[2/4] 加载评分标准...")
-    rubric_dir = Path(rubric_dir)
     print(f"  Rubric目录: {rubric_dir}")
 
-    print(f"\n[3/4] VLM评分...")
+    print(f"\n[3/4] VLM评分...\n")
 
     grading_results = []
 
     for block in answer_blocks:
         question_id = block['question_id']
-        image_path = block['image_path']
+        image_path = Path(block['image_path'])
 
-        print(f"\n  评分 {question_id}...")
+        print(f"  评分 {question_id}...")
 
-        rubric = load_rubric(rubric_dir, question_id)
+        if not image_path.exists():
+            print(f"    跳过（图片不存在）")
+            continue
+
+        rubric = load_rubric(Path(rubric_dir), question_id)
 
         if not rubric:
             print(f"    跳过（无rubric）")
             continue
 
-        question_type = rubric.get('question_type', '')
+        question_type = rubric.get('question_type', rubric.get('type', ''))
 
         objective_types = [
             'choice', 'multiple_choice',
@@ -285,7 +247,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
             grading_result = {
                 'question_id': question_id,
                 'page': block['page'],
-                'image_path': image_path,
+                'image_path': str(image_path),
                 'rubric': rubric,
                 'vlm_score': None,
                 'max_score': rubric.get('total_score', 0),
@@ -313,7 +275,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
         grading_result = {
             'question_id': question_id,
             'page': block['page'],
-            'image_path': image_path,
+            'image_path': str(image_path),
             'rubric': rubric,
             'vlm_score': vlm_result.get('total_score', 0),
             'max_score': vlm_result.get('max_score', 0),
@@ -325,9 +287,9 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
         grading_results.append(grading_result)
 
         print(f"\n    【评分结果】")
-        print(f"    得分: {vlm_result['total_score']}/{vlm_result['max_score']}")
+        print(f"    得分: {vlm_result.get('total_score', 0)}/{vlm_result.get('max_score', 0)}")
         if vlm_result.get('comment'):
-            print(f"    评语: {vlm_result['comment'][:100]}")
+            print(f"    评语: {vlm_result.get('comment', '')[:100]}")
         print()
 
         vlm_detail_dir = Path(output_json).parent / "vlm_details"
@@ -350,7 +312,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
 
     print(f"\n[4/4] 保存评分结果...")
 
-    total_score = sum(r['vlm_score'] for r in grading_results if r.get('vlm_score') is not None)
+    total_score = sum(r.get('vlm_score', 0) for r in grading_results if r.get('vlm_score') is not None)
     max_total = sum(r['max_score'] for r in grading_results if r.get('vlm_score') is not None)
 
     skipped_count = sum(1 for r in grading_results if r.get('skipped'))
@@ -395,35 +357,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     print(f"\n{'='*80}")
     print("评分完成")
     print(f"{'='*80}")
-    print(f"学生ID: {student_id}")
-    print(f"VLM评分: {total_score}/{max_total} (主观题)")
-    print(f"VLM评分题数: {len(grading_results) - skipped_count}")
-    print(f"跳过客观题: {skipped_count}")
-    print(f"总题数: {len(grading_results)}")
+    print(f"主观题总分: {total_score}/{max_total}")
+    print(f"客观题跳过: {skipped_count}题")
     print(f"输出JSON: {output_json}")
-    print(f"\n说明: 客观题需要用OCR+规则匹配单独评分")
-
-    return output_data
-
-
-def main():
-    PROCESSED_JSON = BASE_DIR / "outputs/processed_answers/xiaoming_processed.json"
-    RUBRIC_DIR = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/rubric_guided_scoring"
-    OUTPUT_JSON = BASE_DIR / "outputs/vlm_grading/xiaoming_grading.json"
-
-    if not PROCESSED_JSON.exists():
-        print(f"错误: 处理后的答案不存在: {PROCESSED_JSON}")
-        print("请先运行: python process_adjusted_detections.py")
-        return
-
-    grade_with_vlm(
-        processed_json=PROCESSED_JSON,
-        rubric_dir=RUBRIC_DIR,
-        output_json=OUTPUT_JSON,
-        vlm_model='local',
-        api_url='http://127.0.0.1:9900'
-    )
-
-
-if __name__ == '__main__':
-    main()
+    print(f"详细报告: {summary_file}")
