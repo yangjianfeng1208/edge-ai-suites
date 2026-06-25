@@ -1,12 +1,26 @@
+grading:
+  skip_subjective: true
+  skip_yolo_detection: false
+
+detection:
+  json_path: "./test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
+  yolo_conf: 0.15
+  yolo_iou: 0.5
+  pdf_render_dpi: 300
+
+ocr:
+  use_cached: false
+  save_pdf_images: true
+  pdf_dpi: 50
+  max_pixels: 10000000
+  max_tokens: 4096
+
 vlm_service:
   base_url: "http://127.0.0.1:9900"
-  timeout: 30
+  timeout: 300
   max_retries: 2
 
-ocr_config:
-  lang: 'ch'
-  use_gpu: false
-  det_db_thresh: 0.3
-  rec_image_shape: '3,48,320'
-
-concurrent_workers: 1
+ocr_service:
+  base_url: "http://127.0.0.1:9901"
+  timeout: 300
+  max_retries: 2

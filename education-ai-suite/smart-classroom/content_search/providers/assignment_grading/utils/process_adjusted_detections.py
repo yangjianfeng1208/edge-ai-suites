@@ -9,20 +9,20 @@ sys.path.insert(0, str(BASE_DIR.parent))
 
 def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
     print(f"\n{'='*80}")
-    print("处理调整后的YOLO检测结果")
+    print("Processing adjusted YOLO detection results")
     print(f"{'='*80}")
 
-    print(f"\n[1/5] 加载检测结果...")
+    print(f"\n[1/5] Loading detection results...")
     with open(detection_json, 'r', encoding='utf-8') as f:
         detection_data = json.load(f)
 
-    print(f"  检测JSON中记录的PDF: {detection_data['source_pdf']}")
-    print(f"  总页数: {detection_data['total_pages']}")
+    print(f"  PDF in detection JSON: {detection_data['source_pdf']}")
+    print(f"  Total pages: {detection_data['total_pages']}")
 
     total_detections = sum(len(v) for v in detection_data['detections'].values())
-    print(f"  总检测数: {total_detections}")
+    print(f"  Total detections: {total_detections}")
 
-    print(f"\n[2/5] 渲染PDF...")
+    print(f"\n[2/5] Rendering PDF...")
     from utils.pdf_utils import render_pdf_to_images
 
     if pdf_path is None:
@@ -30,11 +30,11 @@ def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
     else:
         pdf_path = Path(pdf_path)
 
-    print(f"  实际使用的PDF: {pdf_path}")
+    print(f"  Actual PDF used: {pdf_path}")
     pages = render_pdf_to_images(pdf_path, dpi=300)
     pages_dict = {p['page_num']: p for p in pages}
 
-    print(f"\n[3/5] 提取Answer_Block...")
+    print(f"\n[3/5] Extracting Answer_Block...")
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -59,7 +59,7 @@ def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
             img_path = output_dir / f"{question_id}.jpg"
             cv2.imwrite(str(img_path), answer_img)
 
-            print(f"  {question_id} (第{page_num}页) - bbox={bbox}")
+            print(f"  {question_id} (page {page_num}) - bbox={bbox}")
 
             answer_blocks.append({
                 'question_id': question_id,
@@ -69,14 +69,14 @@ def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
                 'image_path': str(img_path)
             })
 
-    print(f"\n[4/5] OCR识别答案...")
-    print("  跳过OCR（PyTorch环境问题），只保存图片")
+    print(f"\n[4/5] OCR recognition...")
+    print("  Skipping OCR (PyTorch environment issue), saving images only")
 
     for block in answer_blocks:
         block['student_answer'] = ""
         block['ocr_skipped'] = True
 
-    print(f"\n[5/5] 保存结果...")
+    print(f"\n[5/5] Saving results...")
 
     output_data = {
         'student_id': pdf_path.parent.name,
@@ -92,24 +92,23 @@ def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
     print(f"\n{'='*80}")
-    print("处理完成")
+    print("Processing completed")
     print(f"{'='*80}")
-    print(f"学生ID: {output_data['student_id']}")
-    print(f"答题区域数: {len(answer_blocks)}")
-    print(f"输出JSON: {output_json}")
-    print(f"\n下一步: 配合rubric送VLM评分")
+    print(f"Student ID: {output_data['student_id']}")
+    print(f"Answer regions: {len(answer_blocks)}")
+    print(f"Output JSON: {output_json}")
+    print(f"\nNext step: Send to VLM grading with rubric")
 
     return output_data
 
 
 def main():
-    # DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/xiaoming/yolo_detections.json"
     BASE_DIR = Path("C:/Users/user/jianfeng/EDU-AI/PR/edge-ai-my-fork/education-ai-suite/smart-classroom/content_search/providers/assignment_grading")
     DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_math/yolo_detections.json"
     OUTPUT_DIR = BASE_DIR / "outputs/processed_answers"
 
     if not DETECTION_JSON.exists():
-        print(f"错误: 检测结果不存在: {DETECTION_JSON}")
+        print(f"Error: Detection results not found: {DETECTION_JSON}")
         return
 
     process_adjusted_detections(DETECTION_JSON, OUTPUT_DIR)

@@ -17,7 +17,6 @@ import time
 import traceback
 import uvicorn
 
-# 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [%(levelname)7s] %(message)s',
@@ -25,27 +24,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 模型路径（绝对路径）
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, "..", "models", "Qwen3.5-9B-int8-ov")
 MODEL_PATH = os.path.normpath(MODEL_PATH)
 
-# 设备配置（优先GPU，失败则回退CPU）
 DEVICE = "GPU.1"
 PORT = 9900
 
-# 全局模型变量
 vlm_pipeline = None
 current_device = None
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """应用生命周期管理"""
-    # 启动时加载模型
     load_model()
     yield
-    # 关闭时清理（如果需要）
 
 
 # FastAPI应用
@@ -161,7 +154,7 @@ def load_model():
         current_device = DEVICE
 
         load_time = time.time() - start_time
-        logger.info(f"✓ Model loaded successfully on {DEVICE} ({load_time:.1f}s)")
+        logger.info(f"Model loaded successfully on {DEVICE} ({load_time:.1f}s)")
 
     except Exception as e:
         if DEVICE == "GPU":
@@ -173,7 +166,7 @@ def load_model():
                 vlm_pipeline = ov_genai.VLMPipeline(MODEL_PATH, "CPU")
                 current_device = "CPU"
                 load_time = time.time() - start_time
-                logger.info(f"✓ Model loaded successfully on CPU ({load_time:.1f}s)")
+                logger.info(f"Model loaded successfully on CPU ({load_time:.1f}s)")
             except Exception as cpu_error:
                 logger.error(f"Failed to load on CPU: {cpu_error}")
                 traceback.print_exc()
@@ -188,7 +181,6 @@ def load_model():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """健康检查接口"""
     if vlm_pipeline is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
@@ -202,14 +194,12 @@ async def health_check():
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(request: ChatCompletionRequest):
-    """OpenAI兼容的Chat Completion接口"""
     start_time = time.time()
 
     try:
         if not request.messages:
             raise HTTPException(status_code=400, detail="No messages provided")
 
-        # 提取最后一条用户消息
         user_message = None
         for msg in reversed(request.messages):
             if msg.role == 'user':
@@ -219,12 +209,10 @@ async def chat_completions(request: ChatCompletionRequest):
         if not user_message:
             raise HTTPException(status_code=400, detail="No user message found")
 
-        # 解析消息内容
         content = user_message.content
         if isinstance(content, str):
             content = [ContentText(type="text", text=content)]
 
-        # 提取文本和图片
         prompt_text = ""
         images = []
 
@@ -268,11 +256,9 @@ async def chat_completions(request: ChatCompletionRequest):
         gen_config.do_sample = False
 
         if images:
-            # 转换为OpenVINO Tensor (batch_size=1)
             image_array = np.array(images[0])
             logger.debug(f"Image array shape: {image_array.shape}")
 
-            # 添加batch维度
             image_tensor = ov.Tensor(image_array[None])
 
             result = vlm_pipeline.generate(

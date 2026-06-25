@@ -1,0 +1,7 @@
+server:
+  host: "0.0.0.0"
+  port: 9901
+
+model:
+  path: "../models/ov_paddleocr-vl-1_6_model"
+  device: "GPU.1"

@@ -94,7 +94,7 @@ def detect_title_anchor(image, page_num: int) -> Dict:
         text = line[1][0].strip()
         bbox = line[0]
 
-        if '2025' in text and ('上海' in text or '中考' in text or '语文' in text):
+        if '2025' in text and any(keyword in text for keyword in ['Shanghai', 'Exam', 'Test']):
             y_coords = [p[1] for p in bbox]
             x_coords = [p[0] for p in bbox]
             center_x = sum(x_coords) / len(x_coords)

@@ -4,40 +4,22 @@ from pathlib import Path
 
 
 def normalize_question_id(question_id, question_mapping=None):
-    """
-    统一题号格式：Q1, Q1_1, Q2_1 等 -> 数字
-
-    Args:
-        question_id: 题号
-        question_mapping: 可选的映射字典 {"Q1_1": "1", "Q2_1": "7", ...}
-
-    Examples:
-        "Q1_1" (with mapping) -> "1"
-        "Q1" -> "1"
-        "Q1_1" (no mapping) -> "1"
-        "Q2_1" (no mapping) -> "1"
-        "1" -> "1"
-    """
     if isinstance(question_id, int):
         return str(question_id)
 
     question_id = str(question_id).strip()
 
-    # 优先使用question_mapping
     if question_mapping and question_id in question_mapping:
         return question_mapping[question_id]
 
-    # 如果已经是纯数字，直接返回
     if question_id.isdigit():
         return question_id
 
-    # 处理 Q1_1 格式：提取下划线后的数字
     if '_' in question_id:
         parts = question_id.split('_')
         if len(parts) == 2 and parts[1].isdigit():
             return parts[1]
 
-    # 处理 Q1 格式：去掉Q前缀
     if question_id.startswith('Q') and question_id[1:].isdigit():
         return question_id[1:]
 
@@ -45,23 +27,12 @@ def normalize_question_id(question_id, question_mapping=None):
 
 
 def parse_objective_answers_from_ocr(ocr_text_path, answer_key_path):
-    """
-    从OCR文本中提取客观题答案（选择题+填空题）
-
-    Args:
-        ocr_text_path: OCR文本文件路径
-        answer_key_path: 标准答案JSON路径
-
-    Returns:
-        dict: {question_number: student_answer}
-    """
     with open(ocr_text_path, 'r', encoding='utf-8') as f:
         ocr_text = f.read()
 
     with open(answer_key_path, 'r', encoding='utf-8') as f:
         answer_key_data = json.load(f)
 
-    # 提取answers部分
     answer_key = answer_key_data.get('answers', answer_key_data)
 
     student_answers = {}
@@ -310,32 +281,15 @@ def extract_blank_answer(ocr_text, q_num):
 
 
 def grade_objective_questions(student_answers, answer_key, verbose=False):
-    """
-    评分客观题
-
-    Args:
-        student_answers: {question_number: student_answer}
-        answer_key: 标准答案JSON或其中的answers部分
-        verbose: 是否打印详细匹配信息
-
-    Returns:
-        dict: {
-            'results': {question_number: {...}},
-            'total_score': int,
-            'max_score': int
-        }
-    """
     results = {}
     total_score = 0
     max_score = 0
 
-    # 提取answers部分
     if 'answers' in answer_key and 'metadata' in answer_key:
         answer_key_data = answer_key['answers']
     else:
         answer_key_data = answer_key
 
-    # 构建反向映射: alias -> question_number
     alias_to_qnum = {}
     for q_num, q_info in answer_key_data.items():
         if q_num in ['comment', 'metadata', '_fields'] or not isinstance(q_info, dict):
@@ -344,7 +298,6 @@ def grade_objective_questions(student_answers, answer_key, verbose=False):
         if alias:
             alias_to_qnum[alias] = q_num
 
-    # 标准化学生答案的题号
     normalized_student_answers = {}
     for q_id, ans in student_answers.items():
         if q_id in alias_to_qnum:
@@ -489,43 +442,27 @@ def grade_objective_questions(student_answers, answer_key, verbose=False):
 
 
 def check_blank_answer(student_ans, correct_ans, tolerance, match_mode='any', answer_format='string'):
-    """
-    检查填空题答案是否正确
-
-    Args:
-        student_ans: 学生答案
-        correct_ans: 标准答案（可能是单个或列表）
-        tolerance: 数值容差
-        match_mode: 匹配模式
-        answer_format: 答案格式 'string', 'number', 'latex'
-    """
     if student_ans is None:
         return False
 
-    # 根据format选择标准化方式
     if answer_format == 'latex':
-        # LaTeX格式：转换为LaTeX再标准化
         student_ans_normalized = normalize_answer(convert_to_latex_format(student_ans))
     else:
-        # 其他格式：直接标准化
         student_ans_normalized = normalize_answer(student_ans)
 
-    # 处理不同的匹配模式
     if match_mode == 'any':
-        # 任意一个匹配即可
         if not isinstance(correct_ans, list):
             correct_ans = [correct_ans]
 
         for ans in correct_ans:
             if answer_format == 'latex':
-                ans_normalized = normalize_answer(ans)  # 标准答案已经是LaTeX格式
+                ans_normalized = normalize_answer(ans)
             else:
                 ans_normalized = normalize_answer(ans)
 
             if student_ans_normalized == ans_normalized:
                 return True
 
-            # 数值比较
             if answer_format == 'number':
                 try:
                     if abs(float(student_ans_normalized) - float(ans_normalized)) <= tolerance:
@@ -535,19 +472,13 @@ def check_blank_answer(student_ans, correct_ans, tolerance, match_mode='any', an
         return False
 
     elif match_mode == 'all':
-        # 必须匹配所有答案（顺序）
-        # 暂未实现，需要学生答案也是列表
         return False
 
     elif match_mode == 'set':
-        # 集合匹配（无序）
-        # 暂未实现，需要学生答案也是列表
         return False
 
-    else:  # exact (默认)
-        # 单答案精确匹配
+    else:
         if isinstance(correct_ans, list):
-            # 兼容旧格式
             correct_ans_list = [normalize_answer(ans) for ans in correct_ans]
             return student_ans_normalized in correct_ans_list
 
@@ -556,7 +487,6 @@ def check_blank_answer(student_ans, correct_ans, tolerance, match_mode='any', an
         if student_ans_normalized == correct_ans_normalized:
             return True
 
-        # 数值比较
         try:
             student_num = float(student_ans_normalized)
             correct_num = float(correct_ans_normalized)
@@ -568,9 +498,6 @@ def check_blank_answer(student_ans, correct_ans, tolerance, match_mode='any', an
 
 
 def normalize_answer(answer):
-    """
-    标准化答案：去除空格、统一符号
-    """
     if answer is None:
         return ''
 
@@ -610,21 +537,9 @@ def convert_to_latex_format(answer):
 
 
 def get_objective_score(question_id, ocr_text_path, answer_key_path):
-    """
-    获取单个客观题的得分
-
-    Args:
-        question_id: 题号 (如 "Q1_1" 或 "1")
-        ocr_text_path: OCR文本路径
-        answer_key_path: 标准答案路径
-
-    Returns:
-        dict: {'score': int, 'max_score': int, 'is_correct': bool, 'student_answer': str}
-    """
     with open(answer_key_path, 'r', encoding='utf-8') as f:
         answer_key = json.load(f)
 
-    # 构建alias映射
     alias_to_qnum = {}
     for q_num, q_info in answer_key.items():
         if q_num == 'comment' or not isinstance(q_info, dict):
@@ -633,7 +548,6 @@ def get_objective_score(question_id, ocr_text_path, answer_key_path):
         if alias:
             alias_to_qnum[alias] = q_num
 
-    # 查找题号
     if question_id in alias_to_qnum:
         normalized_id = alias_to_qnum[question_id]
     else:
@@ -678,25 +592,25 @@ if __name__ == '__main__':
     answer_key_path = Path(__file__).parent.parent / 'test_data/2025_sh_zhongkao_math/rubric_guided_scoring/answer_key.json'
 
     print("="*80)
-    print("客观题自动评分测试")
+    print("Objective Question Automatic Grading Test")
     print("="*80)
 
-    print(f"\n[1] 从OCR文本提取学生答案: {ocr_path}")
+    print(f"\n[1] Extract student answers from OCR text: {ocr_path}")
     student_answers = parse_objective_answers_from_ocr(ocr_path, answer_key_path)
 
-    print(f"\n学生答案:")
+    print(f"\nStudent answers:")
     for q_num, ans in sorted(student_answers.items(), key=lambda x: int(x[0])):
         print(f"  Q{q_num}: {ans}")
 
-    print(f"\n[2] 评分")
+    print(f"\n[2] Grading")
     with open(answer_key_path, 'r', encoding='utf-8') as f:
         answer_key = json.load(f)
 
     grading_result = grade_objective_questions(student_answers, answer_key)
 
-    print(f"\n评分结果:")
+    print(f"\nGrading results:")
     for q_num, result in sorted(grading_result['results'].items(), key=lambda x: int(x[0])):
         status = "[V]" if result['is_correct'] else "[X]"
-        print(f"  Q{q_num}: {status} 学生答案={result['student_answer']}, 标准答案={result['correct_answer']}, 得分={result['score']}/{result['max_score']}")
+        print(f"  Q{q_num}: {status} Student={result['student_answer']}, Correct={result['correct_answer']}, Score={result['score']}/{result['max_score']}")
 
-    print(f"\n总分: {grading_result['total_score']}/{grading_result['max_score']}")
+    print(f"\nTotal score: {grading_result['total_score']}/{grading_result['max_score']}")

@@ -1,118 +1,160 @@
-# Assignment Grading Service
+# Automated Grading System
 
-Automated grading system for Math exam assignments using OCR and VLM.
+## Quick Start
 
-## ⚡ Quick Start
-
-**Prerequisites:**
-- VLM service running at `http://127.0.0.1:9900`
-- Main smart-classroom venv already set up
-
-**Run Grading (Windows):**
-```batch
-run_grading.bat
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
 ```
 
-Or manually:
-```batch
-C:\Users\user\jianfeng\EDU-AI\PR\edge-ai-my-fork\education-ai-suite\smart-classroom\venv_smartclassroom\Scripts\python.exe grading_prototype.py
+### 2. Edit Configuration
+```bash
+# Edit config.yaml to set:
+# - Detection JSON path
+# - OCR/VLM service URLs
+# - Grading options
 ```
 
-**Prepare Test Data:**
-1. Place assignment images (JPG/PNG) in `test_data/math/` folder
-2. Configure `answer_key.json` with standard answers
-3. Adjust `config.yaml` if needed
+### 3. Start Services
 
-**Results:**
-- Output files saved to `outputs/` folder
-- Each assignment gets a `{filename}_result.json`
-
-## 📁 Project Structure
-
-```
-assignment_grading/
-├── DESIGN.md                # Detailed design document
-├── README.md                # This file
-├── run_grading.bat          # Windows launcher script
-├── grading_prototype.py     # Main implementation
-├── answer_key.json          # Standard answers
-├── config.yaml              # Configuration
-├── requirements.txt         # Python dependencies
-├── models/                  # Local model cache
-│   ├── ch_PP-OCRv4_det_infer/
-│   ├── ch_PP-OCRv4_rec_infer/
-│   └── UVDoc/
-├── test_data/math/          # Input: student assignments
-│   ├── math_paper_1.jpg
-│   └── math_paper_2.jpg
-└── outputs/                 # Output: grading results
-    ├── math_paper_1_result.json
-    └── math_paper_2_result.json
+**OCR Server:**
+```bash
+python ocr_services/paddleocr_vl_server.py
 ```
 
-## ⚙️ Configuration
-
-**answer_key.json:**
-```json
-{
-  "1": {"type": "choice", "answer": "B", "score": 2},
-  "7": {"type": "blank", "answer": "0.5", "tolerance": 0.05, "score": 3},
-  "19": {"type": "calculation", "max_score": 10}
-}
+**VLM Server:**
+```bash
+python Qwen_services/vlm_server.py
 ```
+
+### 4. Run Grading
+```bash
+python main.py
+```
+
+## Pipeline
+
+```
+┌─────────────────┐
+│  PDF Exam Paper │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  YOLO Detection     │  ← Detect answer regions
+│  (skip if cached)   │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Extract Regions    │  ← Crop answer boxes
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  OCR Recognition    │  ← PaddleOCR-VL (GPU)
+│  (API call)         │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Grade Objective    │  ← Rule-based matching
+│  (choice + blank)   │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Grade Subjective   │  ← VLM scoring
+│  (API call)         │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  JSON Results       │
+└─────────────────────┘
+```
+
+## Configuration
 
 **config.yaml:**
 ```yaml
-subject: "Math"
-question_type_map:
-  1-6: choice
-  7-18: blank
-  19-25: calculation
+grading:
+  skip_subjective: false         # Enable/disable VLM grading
+  skip_yolo_detection: false     # Skip YOLO, use cached
+
+detection:
+  json_path: "./test_data/..."   # Detection results
+  yolo_conf: 0.15
+  yolo_iou: 0.5
+
+ocr:
+  use_cached: false              # Use cached OCR text
+  pdf_dpi: 50
+  max_pixels: 10000000
+
+ocr_service:
+  base_url: "http://127.0.0.1:9901"
 
 vlm_service:
   base_url: "http://127.0.0.1:9900"
-  timeout: 30
-  max_retries: 2
-
-ocr_config:
-  lang: 'ch'
-  use_gpu: false
-
-concurrent_workers: 2
 ```
 
-## ✅ Implementation Status
+## Output
 
-- [x] Design document completed (DESIGN.md)
-- [x] Core pipeline implemented
-- [x] Three-stage grading architecture
-  - [x] Image preprocessing (CLAHE/aggressive)
-  - [x] Question segmentation (regex-based)
-  - [x] Type-specific grading (choice/blank/calculation)
-- [x] PaddleOCR integration (Chinese OCR)
-- [x] VLM integration (Qwen2.5-VL-3B)
-- [x] Concurrent processing (ThreadPoolExecutor)
-- [x] JSON output format
-- [x] Tested with sample data
+```
+outputs/
+└── {exam_name}/
+    ├── ocr_text/
+    │   └── {exam_name}_ocr.txt
+    ├── objective_grading.json
+    ├── processed_answers/
+    └── vlm_grading/
+```
 
-## ⚠️ Known Issues
+---
 
-1. **Environment:** Requires main venv_smartclassroom for PaddlePaddle compatibility
-2. **OCR Accuracy:** May need better image preprocessing for rotated/blurred images
-3. **Answer Extraction:** Regex patterns may need tuning for different question formats
+## Appendix: YOLO Training
 
-## 🔧 Troubleshooting
+### Prepare Dataset
 
-**If VLM service not running:**
+1. Annotate exam papers with answer regions
+2. Export to YOLO format (images + labels)
+3. Organize as:
+```
+dataset/
+├── train/
+│   ├── images/
+│   └── labels/
+├── valid/
+│   ├── images/
+│   └── labels/
+└── data.yaml
+```
+
+### Train Model
+
 ```bash
-python start_services.py --services vlm
+cd yolo/train_yolo
+python train_yolo_hilex.py
 ```
 
-**If OCR models missing:**
-Models are automatically downloaded to `C:\Users\user\.paddleocr\` on first run.
+**Training script does:**
+- Fix data.yaml paths
+- Load YOLO11n pretrained model
+- Train on dataset (100 epochs, 640px, batch 16)
+- Save best model to `models/yolo_hilex/`
 
-## 📚 References
+### Validate Model
 
-- Design Doc: [DESIGN.md](DESIGN.md)
-- GitHub Issue: https://github.com/open-edge-platform/edge-ai-suites/issues/2781
-- Jira Ticket: ITEP-93144
+```bash
+python validate_trained_model.py
+```
+
+### Use Trained Model
+
+Update detection JSON to use new model:
+```json
+{
+  "yolo_model": "yolo/train_yolo/models/yolo_hilex/weights/best.pt"
+}
+```

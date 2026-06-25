@@ -1,31 +1,38 @@
 from pathlib import Path
 import sys
 import json
+import yaml
 
 BASE_DIR = Path(__file__).parent
 
 
 def main():
     print("="*80)
-    print("自动评分系统")
+    print("Automated Grading System")
     print("="*80)
 
-    SKIP_SUBJECTIVE = True
-    USE_CACHED_OCR = False
-    OCR_DEVICE = "GPU.1"
-    SAVE_PDF_IMAGES = False
-    PDF_DPI = 50
-    OCR_MAX_PIXELS = 10000000
-    OCR_MAX_TOKENS = 4096
+    config_path = BASE_DIR / "config.yaml"
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
 
-    # DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_math/papers/student1/yolo_detections.json"
-    DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
+    SKIP_SUBJECTIVE = config['grading']['skip_subjective']
+    SKIP_YOLO = config['grading']['skip_yolo_detection']
+    USE_CACHED_OCR = config['ocr']['use_cached']
+    SAVE_PDF_IMAGES = config['ocr']['save_pdf_images']
+    PDF_DPI = config['ocr']['pdf_dpi']
+    OCR_MAX_PIXELS = config['ocr']['max_pixels']
+    OCR_MAX_TOKENS = config['ocr']['max_tokens']
+    YOLO_CONF = config['detection']['yolo_conf']
+    YOLO_IOU = config['detection']['yolo_iou']
+    PDF_RENDER_DPI = config['detection']['pdf_render_dpi']
+
+    DETECTION_JSON = BASE_DIR / config['detection']['json_path']
 
     if not DETECTION_JSON.exists():
-        print(f" 错误: 检测JSON不存在: {DETECTION_JSON}")
+        print(f"Error: Detection JSON not found: {DETECTION_JSON}")
         return
 
-    print(f"\n[配置] 加载检测JSON配置...")
+    print(f"\nLoading configuration...")
     with open(DETECTION_JSON, 'r', encoding='utf-8') as f:
         detection_data = json.load(f)
 
@@ -39,7 +46,7 @@ def main():
             break
 
     if not exam_root:
-        print(f"\n 错误: 找不到rubric_guided_scoring目录")
+        print(f"Error: rubric_guided_scoring directory not found")
         return
 
     exam_name = exam_root.name
@@ -47,46 +54,54 @@ def main():
     PROCESSED_OUTPUT_DIR = OUTPUT_BASE / "processed_answers"
     RUBRIC_DIR = exam_root / "rubric_guided_scoring"
     GRADING_OUTPUT = OUTPUT_BASE / "vlm_grading" / f"{exam_name}_grading.json"
-    VLM_API_URL = "http://127.0.0.1:9900"
+    VLM_API_URL = config['vlm_service']['base_url']
+    OCR_API_URL = config['ocr_service']['base_url']
 
-    print(f"  PDF路径: {PDF_PATH}")
-    print(f"  YOLO模型: {YOLO_MODEL}")
-    print(f"  Rubric目录: {RUBRIC_DIR}")
-    print(f"  评分输出: {GRADING_OUTPUT}")
+    print(f"  PDF: {PDF_PATH.name}")
+    print(f"  YOLO: {YOLO_MODEL.name}")
+    print(f"  Output: {OUTPUT_BASE}")
 
     if not PDF_PATH.exists():
-        print(f"\n 错误: PDF不存在: {PDF_PATH}")
+        print(f"\nError: PDF not found: {PDF_PATH}")
         return
 
     if not YOLO_MODEL.exists():
-        print(f"\n 错误: YOLO模型不存在: {YOLO_MODEL}")
-        print(f"   请运行训练脚本生成模型")
+        print(f"\nError: YOLO model not found: {YOLO_MODEL}")
+        print(f"  Please run training script to generate model")
         return
 
-    if True:  
+    step = 0
+    total = 3
+    if not SKIP_YOLO:
+        total += 1
+    if not SKIP_SUBJECTIVE:
+        total += 1
+
+    if not SKIP_YOLO:
+        step += 1
         print(f"\n{'='*80}")
-        print("[0/3] YOLO检测答题区域")
+        print(f"[Step {step}/{total}] YOLO Detection")
         print(f"{'='*80}")
 
         from ultralytics import YOLO
         from utils.pdf_utils import render_pdf_to_images
 
         try:
-            print(f"\n加载YOLO模型...")
+            print(f"\nLoading YOLO model...")
             model = YOLO(str(YOLO_MODEL))
 
-            print(f"渲染PDF...")
-            pages = render_pdf_to_images(PDF_PATH, dpi=300)
-            print(f"共{len(pages)}页")
+            print(f"Rendering PDF...")
+            pages = render_pdf_to_images(PDF_PATH, dpi=PDF_RENDER_DPI)
+            print(f"Total pages: {len(pages)}")
 
-            print(f"\n开始检测...")
+            print(f"\nStarting detection...")
             all_detections = {}
 
             for page_data in pages:
                 page_num = page_data['page_num']
                 image = page_data['image']
 
-                results = model(image, conf=0.15, iou=0.5, verbose=False)
+                results = model(image, conf=YOLO_CONF, iou=YOLO_IOU, verbose=False)
                 boxes = results[0].boxes
 
                 page_detections = []
@@ -107,23 +122,21 @@ def main():
                     page_detections.append(detection)
 
                 all_detections[page_num] = page_detections
-                print(f"  第{page_num}页: {len(page_detections)}个区域")
+                print(f"  Page {page_num}: {len(page_detections)} regions")
 
-            print(f"\n YOLO检测完成")
-            print(f"   总检测数: {sum(len(v) for v in all_detections.values())}")
+            print(f"\nCompleted: {sum(len(v) for v in all_detections.values())} regions detected")
 
         except Exception as e:
-            print(f"\n YOLO检测失败: {e}")
+            print(f"\nError: YOLO detection failed: {e}")
             import traceback
             traceback.print_exc()
             return
     else:
-        pass
+        print(f"\nUsing cached detection: {DETECTION_JSON}")
 
-    print(f"\n 使用检测结果: {DETECTION_JSON}")
-
+    step += 1
     print(f"\n{'='*80}")
-    print("[1/4] 提取答题区域")
+    print(f"[Step {step}/{total}] Extract Answer Regions")
     print(f"{'='*80}")
 
     from utils.process_adjusted_detections import process_adjusted_detections
@@ -131,97 +144,128 @@ def main():
     try:
         processed_data = process_adjusted_detections(DETECTION_JSON, PROCESSED_OUTPUT_DIR, pdf_path=PDF_PATH)
         processed_json = PROCESSED_OUTPUT_DIR / f"{processed_data['student_id']}_processed.json"
-        print(f"\n 答题区域提取完成")
-        print(f"   共提取 {processed_data['total_answer_blocks']} 个答题区域")
-        print(f"   输出: {processed_json}")
+        print(f"\nCompleted: {processed_data['total_answer_blocks']} regions extracted")
+        print(f"  Output: {processed_json}")
     except Exception as e:
-        print(f"\n 提取答题区域失败: {e}")
+        print(f"\nError: Extraction failed: {e}")
         import traceback
         traceback.print_exc()
         return
 
+    step += 1
     print(f"\n{'='*80}")
-    print("[2/4] OCR识别答卷")
+    print(f"[Step {step}/{total}] OCR Recognition")
     print(f"{'='*80}")
 
     OCR_TEXT = OUTPUT_BASE / "ocr_text" / f"{exam_name}_ocr.txt"
-    OCR_MODEL_PATH = BASE_DIR / "models/ov_paddleocr-vl-1_6_model"
 
     if USE_CACHED_OCR and OCR_TEXT.exists():
         print(f"\n Using cached OCR result: {OCR_TEXT}")
     else:
-        if not OCR_MODEL_PATH.exists():
-            print(f"\n OCR model not found: {OCR_MODEL_PATH}")
-            print(f"   Please run: cd ocr_services && venv\\Scripts\\python download_and_convert_model.py")
-            print(f"   Skipping OCR step...")
-        else:
-            try:
-                import sys
-                sys.path.insert(0, str(BASE_DIR / "ocr_services"))
-                from paddleocr_vl_service import PaddleOCRVLService
-                from pdf2image import convert_from_path
+        try:
+            import requests
+            from pdf2image import convert_from_path
+            import io
 
-                print(f"\n Loading PaddleOCR-VL model...")
-                print(f"   Device: {OCR_DEVICE}")
-                ocr_service = PaddleOCRVLService(model_path=OCR_MODEL_PATH, device=OCR_DEVICE)
+            print(f"\n Checking OCR server health...")
+            print(f"   URL: {OCR_API_URL}")
+            health_response = requests.get(f"{OCR_API_URL}/health", timeout=5)
+            if health_response.status_code != 200:
+                raise Exception(f"OCR server not healthy: {health_response.text}")
 
-                print(f"\n Converting PDF to images...")
-                print(f"   DPI: {PDF_DPI}")
-                images = convert_from_path(PDF_PATH, dpi=PDF_DPI)
-                print(f"   Total pages: {len(images)}")
-                if images:
-                    print(f"   Image size: {images[0].width}x{images[0].height} pixels")
+            health_data = health_response.json()
+            print(f"   Status: {health_data.get('status')}")
+            print(f"   Device: {health_data.get('device')}")
 
-                print(f"\n Converting to grayscale (exam papers are black & white)...")
-                images_gray = [img.convert("L") for img in images]
-                print(f"   Converted {len(images_gray)} pages to grayscale")
+            print(f"\n Converting PDF to images...")
+            print(f"   DPI: {PDF_DPI}")
+            images = convert_from_path(PDF_PATH, dpi=PDF_DPI)
+            print(f"   Total pages: {len(images)}")
+            if images:
+                print(f"   Image size: {images[0].width}x{images[0].height} pixels")
 
-                if SAVE_PDF_IMAGES:
-                    pdf_images_dir = OUTPUT_BASE / "pdf_images"
-                    pdf_images_dir.mkdir(parents=True, exist_ok=True)
-                    for idx, img_gray in enumerate(images_gray, 1):
-                        img_path = pdf_images_dir / f"page_{idx}.jpg"
-                        img_gray.save(img_path, "JPEG", quality=85, optimize=True)
-                    print(f"   PDF images saved to: {pdf_images_dir}")
+            print(f"\n Converting to grayscale...")
+            images_gray = [img.convert("L") for img in images]
+            print(f"   Converted {len(images_gray)} pages to grayscale")
 
-                print(f"\n Running OCR on each page...")
-                print(f"   Max pixels: {OCR_MAX_PIXELS:,}")
-                print(f"   Max tokens: {OCR_MAX_TOKENS}")
-                results = []
+            if SAVE_PDF_IMAGES:
+                pdf_images_dir = OUTPUT_BASE / "pdf_images"
+                pdf_images_dir.mkdir(parents=True, exist_ok=True)
                 for idx, img_gray in enumerate(images_gray, 1):
-                    print(f"   Processing page {idx}/{len(images_gray)}...")
-                    text = ocr_service.ocr_image(
-                        img_gray,
-                        task="ocr",
-                        max_pixels=OCR_MAX_PIXELS,
-                        max_new_tokens=OCR_MAX_TOKENS
-                    )
-                    page_result = f"{'='*80}\nPage {idx}\n{'='*80}\n{text}\n\n"
-                    results.append(page_result)
+                    img_path = pdf_images_dir / f"page_{idx}.jpg"
+                    img_gray.save(img_path, "JPEG", quality=85, optimize=True)
+                print(f"   PDF images saved to: {pdf_images_dir}")
 
-                full_text = "\n".join(results)
+            print(f"\n Running OCR via API on each page...")
+            print(f"   Max pixels: {OCR_MAX_PIXELS:,}")
+            print(f"   Max tokens: {OCR_MAX_TOKENS}")
+            results = []
+            total_inference_time = 0
 
-                OCR_TEXT.parent.mkdir(parents=True, exist_ok=True)
-                with open(OCR_TEXT, 'w', encoding='utf-8') as f:
-                    f.write(full_text)
+            for idx, img_gray in enumerate(images_gray, 1):
+                print(f"   Processing page {idx}/{len(images_gray)}...")
 
-                perf_stats = ocr_service.get_perf_stats()
-                print(f"\n OCR completed")
-                print(f"   Model load time: {perf_stats['model_load_time']:.2f}s")
-                print(f"   Total OCR time: {sum(perf_stats['page_times']):.2f}s")
-                print(f"   Output: {OCR_TEXT}")
+                img_buffer = io.BytesIO()
+                img_gray.save(img_buffer, format='JPEG', quality=85, optimize=True)
+                img_buffer.seek(0)
 
-            except Exception as e:
-                print(f"\n OCR failed: {e}")
-                import traceback
-                traceback.print_exc()
-                print(f"\n Please check if model exists: {OCR_MODEL_PATH}")
-                if not OCR_TEXT.exists():
-                    print(f"   No cached OCR result, skipping objective grading...")
-                    OCR_TEXT = None
+                files = {'file': (f'page_{idx}.jpg', img_buffer, 'image/jpeg')}
+                data = {
+                    'task': 'ocr',
+                    'max_new_tokens': OCR_MAX_TOKENS,
+                    'max_pixels': OCR_MAX_PIXELS
+                }
 
+                response = requests.post(
+                    f"{OCR_API_URL}/ocr/file",
+                    files=files,
+                    data=data,
+                    timeout=120
+                )
+
+                if response.status_code != 200:
+                    raise Exception(f"OCR API failed for page {idx}: {response.text}")
+
+                result = response.json()
+                if not result.get('success'):
+                    raise Exception(f"OCR failed for page {idx}: {result.get('error')}")
+
+                text = result.get('text', '')
+                inference_time = result.get('inference_time', 0)
+                total_inference_time += inference_time
+
+                print(f"     Inference time: {inference_time:.2f}s")
+
+                page_result = f"{'='*80}\nPage {idx}\n{'='*80}\n{text}\n\n"
+                results.append(page_result)
+
+            full_text = "\n".join(results)
+
+            OCR_TEXT.parent.mkdir(parents=True, exist_ok=True)
+            with open(OCR_TEXT, 'w', encoding='utf-8') as f:
+                f.write(full_text)
+
+            print(f"\nCompleted: {len(images_gray)} pages processed in {total_inference_time:.1f}s")
+            print(f"  Avg: {total_inference_time/len(images_gray):.1f}s/page")
+            print(f"  Output: {OCR_TEXT}")
+
+        except requests.exceptions.ConnectionError:
+            print(f"\nError: OCR server not running at {OCR_API_URL}")
+            print(f"  Start with: python ocr_services/paddleocr_vl_server.py")
+            if not OCR_TEXT.exists():
+                print(f"  No cached OCR, skipping objective grading")
+                OCR_TEXT = None
+        except Exception as e:
+            print(f"\nError: OCR failed: {e}")
+            import traceback
+            traceback.print_exc()
+            if not OCR_TEXT.exists():
+                print(f"  No cached OCR, skipping objective grading")
+                OCR_TEXT = None
+
+    step += 1
     print(f"\n{'='*80}")
-    print("[3/4] 客观题评分（规则匹配）")
+    print(f"[Step {step}/{total}] Grade Objective Questions")
     print(f"{'='*80}")
 
     from utils.parse_objective_answers import parse_objective_answers_from_ocr, grade_objective_questions
@@ -242,28 +286,25 @@ def main():
             with open(OBJECTIVE_OUTPUT, 'w', encoding='utf-8') as f:
                 json.dump(objective_result, f, ensure_ascii=False, indent=2)
 
-            print(f"\n 客观题评分完成")
-            print(f"   得分: {objective_result['total_score']}/{objective_result['max_score']}")
-            print(f"   输出: {OBJECTIVE_OUTPUT}")
+            print(f"\nCompleted: {objective_result['total_score']}/{objective_result['max_score']} points")
+            print(f"  Output: {OBJECTIVE_OUTPUT}")
         except Exception as e:
-            print(f"\n 客观题评分失败: {e}")
+            print(f"\nError: Grading failed: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print(f"\n 跳过客观题评分（缺少OCR文本或答案key）")
-        if not OCR_TEXT.exists():
-            print(f"   OCR文本不存在: {OCR_TEXT}")
+        print(f"\nSkipped: Missing OCR text or answer key")
+        if not OCR_TEXT or not OCR_TEXT.exists():
+            print(f"  OCR text not found")
         if not ANSWER_KEY.exists():
-            print(f"   答案key不存在: {ANSWER_KEY}")
+            print(f"  Answer key not found: {ANSWER_KEY}")
 
     if SKIP_SUBJECTIVE:
-        print(f"\n{'='*80}")
-        print("[4/4] 主观题评分 - 已跳过")
-        print(f"{'='*80}")
-        print(f"\n 设置 SKIP_SUBJECTIVE=False 以启用VLM主观题评分")
+        print(f"\nSubjective grading: Skipped (disabled in config.yaml)")
     else:
+        step += 1
         print(f"\n{'='*80}")
-        print("[4/4] 主观题评分（VLM）")
+        print(f"[Step {step}/{total}] Grade Subjective Questions (VLM)")
         print(f"{'='*80}")
 
         from utils.grade_with_vlm import grade_with_vlm
@@ -276,30 +317,27 @@ def main():
                 vlm_model='qwen-vl',
                 api_url=VLM_API_URL
             )
-            print(f"\n 主观题评分完成")
-            print(f"   输出: {GRADING_OUTPUT}")
-            print(f"   详细报告: {GRADING_OUTPUT.parent / 'vlm_details'}")
+            print(f"\nCompleted")
+            print(f"  Output: {GRADING_OUTPUT}")
+            print(f"  Details: {GRADING_OUTPUT.parent / 'vlm_details'}")
         except Exception as e:
-            print(f"\n 主观题评分失败: {e}")
+            print(f"\nError: VLM grading failed: {e}")
             import traceback
             traceback.print_exc()
             return
 
     print(f"\n{'='*80}")
-    print("[5/4] 评分汇总")
+    print("Summary")
     print(f"{'='*80}")
 
     if OCR_TEXT and OCR_TEXT.exists() and ANSWER_KEY.exists():
-        print(f"\n客观题结果:")
-        print(f"  输出: {OBJECTIVE_OUTPUT}")
+        print(f"\nObjective: {OBJECTIVE_OUTPUT}")
 
     if not SKIP_SUBJECTIVE:
-        print(f"\n主观题结果:")
-        print(f"  评分JSON: {GRADING_OUTPUT}")
-        print(f"  详细报告: {GRADING_OUTPUT.parent / 'vlm_details'}")
+        print(f"Subjective: {GRADING_OUTPUT}")
 
     print(f"\n{'='*80}")
-    print(" 评分完成")
+    print("Completed")
     print(f"{'='*80}")
 
 
