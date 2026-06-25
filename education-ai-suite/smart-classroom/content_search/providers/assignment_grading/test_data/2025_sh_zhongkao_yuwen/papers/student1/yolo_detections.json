@@ -1,5 +1,5 @@
 {
-  "source_pdf": "C:\\Users\\user\\jianfeng\\EDU-AI\\PR\\edge-ai-my-fork\\education-ai-suite\\smart-classroom\\content_search\\providers\\assignment_grading\\test_data\\2025_sh_zhongkao_yuwen\\papers\\xiaoming\\yuwen_paper.pdf",
+  "source_pdf": "C:\\Users\\user\\jianfeng\\EDU-AI\\PR\\edge-ai-my-fork\\education-ai-suite\\smart-classroom\\content_search\\providers\\assignment_grading\\test_data\\2025_sh_zhongkao_yuwen\\papers\\student1\\yuwen_paper.pdf",
   "yolo_model": "C:\\Users\\user\\jianfeng\\EDU-AI\\PR\\edge-ai-my-fork\\education-ai-suite\\smart-classroom\\content_search\\providers\\assignment_grading\\models\\yolo_hilex\\yolo11n_hilex\\weights\\best.pt",
   "total_pages": 4,
   "page_dimensions": {

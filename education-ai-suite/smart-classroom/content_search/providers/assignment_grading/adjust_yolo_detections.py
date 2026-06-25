@@ -357,7 +357,7 @@ class AdjustDetectionsHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(html.encode('utf-8'))
 
     def load_detection_json(self):
-        json_path = BASE_DIR / "outputs/yolo_detections/xiaoming_yolo_detections.json"
+        json_path = BASE_DIR / "outputs/yolo_detections/shuxue_yolo_detections.json"
 
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -372,7 +372,8 @@ class AdjustDetectionsHandler(http.server.SimpleHTTPRequestHandler):
 
         from utils.pdf_utils import render_pdf_to_images
 
-        pdf_path = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/xiaoming/yuwen_paper.pdf"
+        # pdf_path = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/xiaoming/yuwen_paper.pdf"
+        pdf_path = BASE_DIR / "test_data/2025_sh_zhongkao_math/2025_sh_zhongkao_math.pdf"
         pages = render_pdf_to_images(pdf_path, dpi=300)
 
         page_img = [p for p in pages if p['page_num'] == page_num][0]['image']
@@ -390,7 +391,7 @@ class AdjustDetectionsHandler(http.server.SimpleHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         data = json.loads(post_data.decode('utf-8'))
 
-        json_path = BASE_DIR / "outputs/yolo_detections/xiaoming_yolo_detections_adjusted.json"
+        json_path = BASE_DIR / "outputs/yolo_detections/shuxue_yolo_detections_adjusted.json"
 
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -407,13 +408,27 @@ def main():
     print(f"\n{'='*80}")
     print("YOLO检测结果调整工具")
     print(f"{'='*80}")
-    print(f"\n1. 浏览器打开: http://localhost:{PORT}")
+
+    port = PORT
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        try:
+            httpd = socketserver.TCPServer(("", port), AdjustDetectionsHandler)
+            break
+        except OSError:
+            if attempt < max_attempts - 1:
+                port += 1
+            else:
+                print(f"Error: Unable to find available port after {max_attempts} attempts")
+                return
+
+    print(f"\n1. 浏览器打开: http://localhost:{port}")
     print(f"2. 在每页上添加/删除/调整检测框")
     print(f"3. 点击'保存JSON'保存修改")
-    print(f"\n输出文件: outputs/yolo_detections/xiaoming_yolo_detections_adjusted.json")
+    print(f"\n输出文件: outputs/yolo_detections/shuxue_yolo_detections_adjusted.json")
     print(f"\n按 Ctrl+C 停止服务器\n")
 
-    with socketserver.TCPServer(("", PORT), AdjustDetectionsHandler) as httpd:
+    with httpd:
         httpd.serve_forever()
 
 

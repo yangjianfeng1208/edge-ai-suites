@@ -59,8 +59,12 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
     standard_answers = rubric.get('standard_answers', rubric.get('reference_answers', []))
     if standard_answers and not standard_answer:
         prompt += "\n\n**参考答案：**"
-        for ans in standard_answers[:3]:
-            prompt += f"\n- {ans}"
+        if isinstance(standard_answers, dict):
+            for key, ans in standard_answers.items():
+                prompt += f"\n- {key}: {ans}"
+        elif isinstance(standard_answers, list):
+            for ans in standard_answers[:3]:
+                prompt += f"\n- {ans}"
 
     few_shot = rubric.get('few_shot_examples', [])
     if few_shot:
@@ -70,7 +74,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
             score = example.get('score', 0)
             prompt += f"\n学生答：{ans[:50]}... → 得分：{score}分"
 
-    prompt += f"\n\n查看图片中学生的手写答案并打分。\n\n直接输出（不要任何其他内容）：\n得分：X/{max_score}\n理由：简要说明\n"
+    prompt += f"\n\n查看图片中学生的手写答案并打分。\n\n**重要：无论你的分析过程多长，最后必须输出：**\n总分：X分\n\n（其中X是最终得分，满分{max_score}分）\n"
 
     image_base64 = encode_image_to_base64(answer_image_path)
 
@@ -82,7 +86,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
     }
 
 
-def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
+def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_retries=2):
     print(f"    调用本地VLM: {api_url}")
 
     payload = {
@@ -90,7 +94,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
         "messages": [
             {
                 "role": "system",
-                "content": "你是一位专业的语文教师。请直接输出评分结果，不要输出思考过程。严格按照指定格式输出。"
+                "content": "你是一位严格的阅卷教师。必须严格按照评分标准逐项检查。不要根据最终答案猜测过程，不要补全学生省略的步骤。直接输出评分结果，不要输出思考过程。"
             },
             {
                 "role": "user",
@@ -108,52 +112,63 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
                 ]
             }
         ],
-        "max_tokens": 3000,
+        "max_tokens": 4096,
         "temperature": 0.0
     }
 
-    try:
-        import requests
-        response = requests.post(
-            f"{api_url}/v1/chat/completions",
-            json=payload,
-            timeout=120
-        )
+    import requests
+    for attempt in range(max_retries):
+        try:
+            print(f"    尝试 {attempt + 1}/{max_retries}...")
+            response = requests.post(
+                f"{api_url}/v1/chat/completions",
+                json=payload,
+                timeout=300
+            )
 
-        response.raise_for_status()
-        data = response.json()
+            if response.status_code != 200:
+                print(f"     错误响应 ({response.status_code}): {response.text[:500]}")
+            response.raise_for_status()
+            data = response.json()
 
-        vlm_output = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+            vlm_output = data.get('choices', [{}])[0].get('message', {}).get('content', '')
 
-        print(f"\n    【VLM原始输出】")
-        print(f"    {'-'*60}")
-        print(f"    {vlm_output[:500]}..." if len(vlm_output) > 500 else vlm_output)
-        print(f"    {'-'*60}\n")
+            print(f"\n    【VLM原始输出】")
+            print(f"    {'-'*60}")
+            print(f"    {vlm_output[:500]}..." if len(vlm_output) > 500 else vlm_output)
+            print(f"    {'-'*60}\n")
 
-        last_500_chars = vlm_output[-500:] if len(vlm_output) > 500 else vlm_output
-
-        score_match = re.search(r'得分[：:]\s*(\d+)\s*/\s*(\d+)', last_500_chars)
-        reason_match = re.search(r'理由[：:]\s*(.+?)(?:\n\n|$)', last_500_chars, re.DOTALL)
-
-        if score_match:
-            total_score = int(score_match.group(1))
-            max_score = int(score_match.group(2))
-            reason = reason_match.group(1).strip()[:200] if reason_match else "见原始输出"
-        else:
             final_score_patterns = [
-                r'(?:最终|总)?得分[：:]\s*(\d+)\s*分',
-                r'应?得[：:]\s*(\d+)\s*分',
-                r'给[：:]\s*(\d+)\s*分',
-                r'评为[：:]\s*(\d+)\s*分',
-                r'(?:可以|应该)?得\s*(\d+)\s*分'
+                (r'总分[：:=\s]*(\d+)\s*分', '总分'),
+                (r'最终答案应该是\s*(\d+)\s*分', '最终答案'),
+                (r'得分[：:]\s*(\d+)\s*/\s*(\d+)', '得分X/Y格式'),
+                (r'(?:最终|综合)得分[：:]\s*(\d+)\s*分', '最终得分'),
+                (r'(?:可以|应该)?得\s*(\d+)\s*分', '得X分'),
             ]
 
             total_score = None
-            for pattern in final_score_patterns:
-                matches = re.findall(pattern, vlm_output)
-                if matches:
-                    total_score = int(matches[-1])
-                    break
+            max_score = vlm_input.get('max_score', 0)
+            reason = "见原始输出"
+
+            for pattern, desc in final_score_patterns:
+                if desc == '得分X/Y格式':
+                    last_1000 = vlm_output[-1000:] if len(vlm_output) > 1000 else vlm_output
+                    match = re.search(pattern, last_1000)
+                    if match:
+                        total_score = int(match.group(1))
+                        max_score = int(match.group(2))
+                        reason_match = re.search(r'理由[：:]\s*(.+?)(?:\n\n|$)', last_1000[match.end():], re.DOTALL)
+                        reason = reason_match.group(1).strip()[:200] if reason_match else "见原始输出"
+                        print(f"     匹配到格式: {desc}")
+                        break
+                else:
+                    matches = list(re.finditer(pattern, vlm_output))
+                    if matches:
+                        last_match = matches[-1]
+                        total_score = int(last_match.group(1))
+                        print(f"     匹配到格式: {desc} (共{len(matches)}处，取最后)")
+                        reason = f"从VLM输出提取：{desc}={total_score}分"
+                        break
 
             if total_score is None:
                 print(f"     未找到得分信息，默认给0分")
@@ -166,31 +181,52 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900'):
                 }
                 return result
 
-            max_score = vlm_input.get('max_score', 0)
-            reason = f"从VLM输出提取：最终得{total_score}分"
+            result = {
+                'total_score': total_score,
+                'max_score': max_score,
+                'comment': reason,
+                'raw_output': vlm_output
+            }
+            print(f"     解析成功：{total_score}/{max_score}分")
 
-        result = {
-            'total_score': total_score,
-            'max_score': max_score,
-            'comment': reason,
-            'raw_output': vlm_output
-        }
-        print(f"     解析成功：{total_score}/{max_score}分")
+            return result
 
-        return result
+        except (requests.exceptions.Timeout, TimeoutError) as e:
+            print(f"\n     超时 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return {
+                    'total_score': 0,
+                    'max_score': vlm_input.get('max_score', 0),
+                    'comment': f'VLM调用超时（已重试{max_retries}次）',
+                    'error': str(e),
+                    'model': model,
+                    'raw_output': ''
+                }
+            print(f"    等待10秒后重试...")
+            import time
+            time.sleep(10)
 
-    except Exception as e:
-        print(f"\n     VLM调用异常: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            'total_score': 0,
-            'max_score': 0,
-            'comment': f'VLM调用错误: {str(e)}',
-            'error': str(e),
-            'model': model,
-            'raw_output': ''
-        }
+        except Exception as e:
+            print(f"\n     VLM调用异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'total_score': 0,
+                'max_score': vlm_input.get('max_score', 0),
+                'comment': f'VLM调用错误: {str(e)}',
+                'error': str(e),
+                'model': model,
+                'raw_output': ''
+            }
+
+    return {
+        'total_score': 0,
+        'max_score': vlm_input.get('max_score', 0),
+        'comment': '所有重试均失败',
+        'error': 'All retries failed',
+        'model': model,
+        'raw_output': ''
+    }
 
 
 def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', api_url='http://127.0.0.1:9900'):
@@ -199,7 +235,19 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     print(f"{'='*80}")
     print(f"VLM API: {api_url}")
 
-    print(f"\n[1/4] 加载学生答案...")
+    print(f"\n[1/5] 加载试卷元数据...")
+    exam_meta_path = Path(rubric_dir) / "exam_meta.json"
+    objective_questions = []
+    if exam_meta_path.exists():
+        with open(exam_meta_path, 'r', encoding='utf-8') as f:
+            exam_meta = json.load(f)
+            objective_questions = exam_meta.get('objective_questions', [])
+        print(f"  客观题: {len(objective_questions)}题")
+        print(f"  客观题列表: {objective_questions[:10]}{'...' if len(objective_questions) > 10 else ''}")
+    else:
+        print(f"  未找到exam_meta.json，将根据rubric的type字段判断")
+
+    print(f"\n[2/5] 加载学生答案...")
     with open(processed_json, 'r', encoding='utf-8') as f:
         processed_data = json.load(f)
 
@@ -209,10 +257,10 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     print(f"  学生ID: {student_id}")
     print(f"  答题数: {len(answer_blocks)}")
 
-    print(f"\n[2/4] 加载评分标准...")
+    print(f"\n[3/5] 加载评分标准...")
     print(f"  Rubric目录: {rubric_dir}")
 
-    print(f"\n[3/4] VLM评分...\n")
+    print(f"\n[4/5] VLM评分...\n")
 
     grading_results = []
 
@@ -226,35 +274,27 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
             print(f"    跳过（图片不存在）")
             continue
 
-        rubric = load_rubric(Path(rubric_dir), question_id)
-
-        if not rubric:
-            print(f"    跳过（无rubric）")
-            continue
-
-        question_type = rubric.get('question_type', rubric.get('type', ''))
-
-        objective_types = [
-            'choice', 'multiple_choice',
-            'fill_in_blank_recitation',
-            'literary_common_sense'
-        ]
-
-        is_objective = any(t in question_type for t in objective_types)
+        is_objective = question_id in objective_questions
 
         if is_objective:
-            print(f"    跳过（客观题，不需要VLM）")
+            print(f"    跳过（客观题，根据exam_meta.json）")
             grading_result = {
                 'question_id': question_id,
                 'page': block['page'],
                 'image_path': str(image_path),
-                'rubric': rubric,
+                'rubric': None,
                 'vlm_score': None,
-                'max_score': rubric.get('total_score', 0),
+                'max_score': 0,
                 'skipped': True,
                 'reason': '客观题，使用OCR+规则匹配评分'
             }
             grading_results.append(grading_result)
+            continue
+
+        rubric = load_rubric(Path(rubric_dir), question_id)
+
+        if not rubric:
+            print(f"    跳过（无rubric）")
             continue
 
         vlm_input = construct_vlm_prompt(question_id, rubric, image_path)
@@ -310,7 +350,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
             f.write(f"{'='*80}\n\n")
             f.write(vlm_result.get('comment', ''))
 
-    print(f"\n[4/4] 保存评分结果...")
+    print(f"\n[5/5] 保存评分结果...")
 
     total_score = sum(r.get('vlm_score', 0) for r in grading_results if r.get('vlm_score') is not None)
     max_total = sum(r['max_score'] for r in grading_results if r.get('vlm_score') is not None)

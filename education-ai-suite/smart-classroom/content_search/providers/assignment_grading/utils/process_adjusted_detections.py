@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
 import cv2
+import sys
 
 BASE_DIR = Path(__file__).parent
+sys.path.insert(0, str(BASE_DIR.parent))
 
 
-def process_adjusted_detections(detection_json, output_dir):
+def process_adjusted_detections(detection_json, output_dir, pdf_path=None):
     print(f"\n{'='*80}")
     print("处理调整后的YOLO检测结果")
     print(f"{'='*80}")
@@ -14,7 +16,7 @@ def process_adjusted_detections(detection_json, output_dir):
     with open(detection_json, 'r', encoding='utf-8') as f:
         detection_data = json.load(f)
 
-    print(f"  来源PDF: {detection_data['source_pdf']}")
+    print(f"  检测JSON中记录的PDF: {detection_data['source_pdf']}")
     print(f"  总页数: {detection_data['total_pages']}")
 
     total_detections = sum(len(v) for v in detection_data['detections'].values())
@@ -23,7 +25,12 @@ def process_adjusted_detections(detection_json, output_dir):
     print(f"\n[2/5] 渲染PDF...")
     from utils.pdf_utils import render_pdf_to_images
 
-    pdf_path = Path(detection_data['source_pdf'])
+    if pdf_path is None:
+        pdf_path = Path(detection_data['source_pdf'])
+    else:
+        pdf_path = Path(pdf_path)
+
+    print(f"  实际使用的PDF: {pdf_path}")
     pages = render_pdf_to_images(pdf_path, dpi=300)
     pages_dict = {p['page_num']: p for p in pages}
 
@@ -96,7 +103,9 @@ def process_adjusted_detections(detection_json, output_dir):
 
 
 def main():
-    DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/xiaoming/yolo_detections.json"
+    # DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/xiaoming/yolo_detections.json"
+    BASE_DIR = Path("C:/Users/user/jianfeng/EDU-AI/PR/edge-ai-my-fork/education-ai-suite/smart-classroom/content_search/providers/assignment_grading")
+    DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_math/yolo_detections.json"
     OUTPUT_DIR = BASE_DIR / "outputs/processed_answers"
 
     if not DETECTION_JSON.exists():

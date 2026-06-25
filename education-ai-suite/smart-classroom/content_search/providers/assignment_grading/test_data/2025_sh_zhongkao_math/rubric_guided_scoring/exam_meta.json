@@ -1,0 +1,71 @@
+{
+  "exam_id": "2025_shanghai_zhongkao_math",
+  "exam_name": "2025年上海市初中学业水平考试数学试卷",
+  "total_score": 150,
+  "duration_minutes": 100,
+  "sections": [
+    {
+      "section_id": "S1",
+      "name": "选择题",
+      "score": 24,
+      "questions": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"],
+      "description": "单项选择题，每题4分"
+    },
+    {
+      "section_id": "S2",
+      "name": "填空题",
+      "score": 36,
+      "questions": ["Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18"],
+      "description": "每题3分"
+    },
+    {
+      "section_id": "S3",
+      "name": "解答题（一）",
+      "score": 16,
+      "questions": ["Q19", "Q20"],
+      "description": "每题8分，要求写出解答过程"
+    },
+    {
+      "section_id": "S4",
+      "name": "解答题（二）",
+      "score": 30,
+      "questions": ["Q21", "Q22", "Q23"],
+      "description": "每题10分，要求写出详细解答过程"
+    },
+    {
+      "section_id": "S5",
+      "name": "解答题（三）",
+      "score": 12,
+      "questions": ["Q24"],
+      "description": "12分，综合性较强"
+    },
+    {
+      "section_id": "S6",
+      "name": "解答题（四）",
+      "score": 20,
+      "questions": ["Q25"],
+      "description": "20分压轴题，综合运用函数、几何等知识"
+    }
+  ],
+  "objective_questions": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18"],
+  "subjective_questions": ["Q19", "Q20", "Q21", "Q22", "Q23", "Q24", "Q25"],
+  "question_score_map": {
+    "Q1": 4, "Q2": 4, "Q3": 4, "Q4": 4, "Q5": 4, "Q6": 4,
+    "Q7": 3, "Q8": 3, "Q9": 3, "Q10": 3, "Q11": 3, "Q12": 3,
+    "Q13": 3, "Q14": 3, "Q15": 3, "Q16": 3, "Q17": 3, "Q18": 3,
+    "Q19": 8, "Q20": 8,
+    "Q21": 10, "Q22": 10, "Q23": 10,
+    "Q24": 12,
+    "Q25": 20
+  },
+  "grading_notes": {
+    "objective_questions": "客观题使用OCR识别后与标准答案精确匹配，不使用VLM评分",
+    "subjective_questions": "主观题需根据rubric使用VLM评分，关注解题步骤、逻辑推理和最终答案",
+    "partial_credit": "主观题根据解题步骤给予部分分数"
+  },
+  "rubric_version": "v1.0",
+  "rubric_coverage": {
+    "Q1-Q18": "客观题，使用answer_key.json",
+    "Q19-Q25": "主观题，使用rubric_guided_scoring/*.json"
+  }
+}
