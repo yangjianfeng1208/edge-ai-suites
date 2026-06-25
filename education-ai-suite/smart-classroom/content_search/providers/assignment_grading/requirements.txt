@@ -1,23 +1,23 @@
-# OCR Dependencies
+# Core dependencies for automated grading system
+
+# OCR (PaddleOCR-VL)
 paddleocr==2.10.0
-paddlepaddle==3.3.1
-opencv-python>=4.8.0
-numpy>=1.24.0
-pyclipper
+paddlepaddle==2.6.2
+openvino-genai==2026.3.0.0.dev20260611
 
-# Basic Dependencies
-requests>=2.31.0
-Pillow>=10.0.0
-pyyaml>=6.0
+# YOLO object detection
+ultralytics==8.4.70
 
-# VLM Dependencies (Qwen3.5-9B with OpenVINO)
-git+https://github.com/huggingface/optimum-intel.git
-torchvision
-transformers>=4.45,<5.1
-openvino
-openvino-tokenizers
-openvino-genai
+# PDF processing
+pdf2image==1.17.0
+PyMuPDF==1.27.2.3
 
-# FastAPI for VLM API Server
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+# Image processing
+opencv-python>=4.10.0
+
+# VLM grading
+transformers==4.54.0
+torch>=2.8.0
+
+# Utilities
+python-dotenv==1.2.2
