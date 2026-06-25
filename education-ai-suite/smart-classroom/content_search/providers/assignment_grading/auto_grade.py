@@ -18,8 +18,8 @@ def main():
     OCR_MAX_PIXELS = 10000000
     OCR_MAX_TOKENS = 4096
 
-    DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_math/papers/student1/yolo_detections.json"
-    # DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
+    # DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_math/papers/student1/yolo_detections.json"
+    DETECTION_JSON = BASE_DIR / "test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
 
     if not DETECTION_JSON.exists():
         print(f" 错误: 检测JSON不存在: {DETECTION_JSON}")

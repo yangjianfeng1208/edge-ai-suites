@@ -72,50 +72,189 @@ def parse_objective_answers_from_ocr(ocr_text_path, answer_key_path):
 
         q_type = q_info.get('type')
 
-        if q_type == 'choice':
+        if q_type == 'group':
+            sub_questions = q_info.get('sub_questions', {})
+            for sub_num, sub_info in sub_questions.items():
+                combined_num = f"{q_num}{sub_num}"
+                sub_type = sub_info.get('type')
+
+                if sub_type == 'choice':
+                    student_answers[combined_num] = extract_choice_answer(ocr_text, combined_num)
+                elif sub_type == 'blank':
+                    answer = extract_blank_answer(ocr_text, combined_num)
+                    if not answer:
+                        answer = fallback_search_in_line(ocr_text, combined_num, sub_info.get('answer', []))
+                    student_answers[combined_num] = answer
+        elif q_type == 'choice':
             student_answers[q_num] = extract_choice_answer(ocr_text, q_num)
         elif q_type == 'blank':
-            student_answers[q_num] = extract_blank_answer(ocr_text, q_num)
+            answer = extract_blank_answer(ocr_text, q_num)
+            if not answer:
+                answer = fallback_search_in_line(ocr_text, q_num, q_info.get('answer', []))
+            student_answers[q_num] = answer
 
     return student_answers
 
 
-def extract_choice_answer(ocr_text, q_num):
-    """
-    提取选择题答案
-    格式: "1. 下列代数式中，计算正确的是（A）"
-    """
-    pattern = rf'^{q_num}\.\s+.*?[（(]([A-D])[)）]'
-    match = re.search(pattern, ocr_text, re.MULTILINE)
+def fallback_search_in_line(ocr_text, q_num, standard_answers):
+    if not standard_answers or not isinstance(standard_answers, list):
+        return None
 
-    if match:
-        return match.group(1)
-    return None
-
-
-def extract_blank_answer(ocr_text, q_num):
-    """
-    提取填空题答案
-    实际格式: "9. ... 是 \\(\\underline{\\text{m < -\\frac{1}{8}}}\\)"
-    实际格式: "11. ... 的解为 \\(\\alpha = 10\\)."
-    """
-    # 查找完整的题目行
     lines = ocr_text.split('\n')
     q_line = None
-    for idx, line in enumerate(lines):
-        if re.match(rf'^{q_num}\.\s+', line):
-            q_line = line
-            break
+
+    if '(' in str(q_num):
+        main_num = q_num.split('(')[0]
+        sub_num = '(' + q_num.split('(')[1]
+
+        if main_num:
+            main_start = None
+            next_main_start = None
+
+            for idx, line in enumerate(lines):
+                if main_start is None and re.match(rf'^{re.escape(main_num)}\.\s+', line):
+                    main_start = idx
+                elif main_start is not None:
+                    if re.match(rf'^\d+\.\s+', line):
+                        next_main_start = idx
+                        break
+
+            if main_start is not None:
+                search_end = next_main_start if next_main_start else len(lines)
+                search_lines = lines[main_start:search_end]
+
+                sub_pattern = rf'^[（(]{re.escape(sub_num[1:-1])}[)）]'
+                for line in search_lines:
+                    if re.match(sub_pattern, line):
+                        q_line = line
+                        break
+        else:
+            pattern = rf'^[（(]{re.escape(q_num[1:-1])}[)）]'
+            for line in lines:
+                if re.match(pattern, line):
+                    q_line = line
+                    break
+    else:
+        pattern = rf'^{re.escape(str(q_num))}\.\s+'
+        for line in lines:
+            if re.match(pattern, line):
+                q_line = line
+                break
 
     if not q_line:
         return None
 
-    # 先尝试提取纯文本答案（"为 X 米"）
+    found_answers = []
+    for answer in standard_answers:
+        if str(answer) in q_line:
+            found_answers.append(str(answer))
+
+    if len(found_answers) == 1:
+        return found_answers[0]
+    elif len(found_answers) > 1:
+        return found_answers
+
+    return None
+
+
+def extract_choice_answer(ocr_text, q_num):
+    if '(' in str(q_num):
+        main_num = q_num.split('(')[0]
+        sub_num = '(' + q_num.split('(')[1]
+
+        if main_num:
+            lines = ocr_text.split('\n')
+            main_start = None
+            next_main_start = None
+
+            for idx, line in enumerate(lines):
+                if main_start is None and re.match(rf'^{re.escape(main_num)}\.\s+', line):
+                    main_start = idx
+                elif main_start is not None:
+                    if re.match(rf'^\d+\.\s+', line):
+                        next_main_start = idx
+                        break
+
+            if main_start is not None:
+                search_end = next_main_start if next_main_start else len(lines)
+                search_text = '\n'.join(lines[main_start:search_end])
+
+                sub_pattern = rf'^[（(]{re.escape(sub_num[1:-1])}[)）].*?[（(]\s*([A-D])\s*[)）]'
+                match = re.search(sub_pattern, search_text, re.MULTILINE)
+                if match:
+                    return match.group(1)
+        else:
+            pattern = rf'^[（(]{re.escape(q_num[1:-1])}[)）].*?[（(]\s*([A-D])\s*[)）]'
+            match = re.search(pattern, ocr_text, re.MULTILINE)
+            if match:
+                return match.group(1)
+    else:
+        q_num_escaped = re.escape(str(q_num))
+        pattern = rf'^{q_num_escaped}\.\s+.*?[（(]\s*([A-D])\s*[)）]'
+        match = re.search(pattern, ocr_text, re.MULTILINE)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def extract_blank_answer(ocr_text, q_num):
+    lines = ocr_text.split('\n')
+    q_line = None
+
+    if '(' in str(q_num):
+        main_num = q_num.split('(')[0]
+        sub_num = '(' + q_num.split('(')[1]
+
+        if main_num:
+            main_start = None
+            next_main_start = None
+
+            for idx, line in enumerate(lines):
+                if main_start is None and re.match(rf'^{re.escape(main_num)}\.\s+', line):
+                    main_start = idx
+                elif main_start is not None:
+                    if re.match(rf'^\d+\.\s+', line):
+                        next_main_start = idx
+                        break
+
+            if main_start is not None:
+                search_end = next_main_start if next_main_start else len(lines)
+                search_lines = lines[main_start:search_end]
+
+                sub_pattern = rf'^[（(]{re.escape(sub_num[1:-1])}[)）]'
+                for line in search_lines:
+                    if re.match(sub_pattern, line):
+                        q_line = line
+                        break
+        else:
+            pattern = rf'^[（(]{re.escape(q_num[1:-1])}[)）]\s+'
+            for line in lines:
+                if re.match(pattern, line):
+                    q_line = line
+                    break
+    else:
+        q_num_escaped = re.escape(str(q_num))
+        pattern = rf'^{q_num_escaped}\.\s+'
+
+        for idx, line in enumerate(lines):
+            if re.match(pattern, line):
+                q_line = line
+                break
+
+    if not q_line:
+        return None
+
+    direct_answer_match = re.search(rf'{re.escape(str(q_num))}\D+[，。：；]\s*(.+?)[。（]', q_line)
+    if direct_answer_match:
+        answer = direct_answer_match.group(1).strip()
+        if answer and len(answer) < 50:
+            return answer
+
     text_answer_match = re.search(r'[为是]\s+([\d.]+)\s*[米元人个张只度]', q_line)
     if text_answer_match:
         return text_answer_match.group(1).strip()
 
-    # 提取所有 \(...\) 块
     latex_blocks = re.findall(r'\\\((.+?)\\\)', q_line)
 
     if not latex_blocks:
@@ -242,50 +381,100 @@ def grade_objective_questions(student_answers, answer_key, verbose=False):
         if q_num in ['comment', 'metadata', '_fields'] or not isinstance(q_info, dict):
             continue
 
-        q_score = q_info.get('score', 0)
-        max_score += q_score
-
-        student_ans = normalized_student_answers.get(q_num)
-        correct_ans = q_info.get('answer')
         q_type = q_info.get('type')
-        match_mode = q_info.get('match_mode', 'any')
-        q_format = q_info.get('format', 'string')
 
-        is_correct = False
+        if q_type == 'group':
+            sub_questions = q_info.get('sub_questions', {})
+            for sub_num, sub_info in sub_questions.items():
+                combined_num = f"{q_num}{sub_num}"
+                sub_score = sub_info.get('score', 0)
+                max_score += sub_score
 
-        if student_ans is None:
-            is_correct = False
-        elif q_type == 'choice':
-            if match_mode == 'any':
-                if isinstance(correct_ans, list):
-                    is_correct = student_ans.upper() in [ans.upper() for ans in correct_ans]
-                else:
-                    is_correct = (student_ans.upper() == str(correct_ans).upper())
-            else:
+                student_ans = normalized_student_answers.get(combined_num)
+                correct_ans = sub_info.get('answer')
+                sub_type = sub_info.get('type')
+                match_mode = sub_info.get('match_mode', 'any')
+                q_format = sub_info.get('format', 'string')
+
                 is_correct = False
-        elif q_type == 'blank':
-            is_correct = check_blank_answer(student_ans, correct_ans, 0, match_mode, q_format)
 
-        earned_score = q_score if is_correct else 0
-        total_score += earned_score
+                if student_ans is None:
+                    is_correct = False
+                elif sub_type == 'choice':
+                    if match_mode == 'any':
+                        if isinstance(correct_ans, list):
+                            is_correct = student_ans.upper() in [ans.upper() for ans in correct_ans]
+                        else:
+                            is_correct = (student_ans.upper() == str(correct_ans).upper())
+                    else:
+                        is_correct = False
+                elif sub_type == 'blank':
+                    is_correct = check_blank_answer(student_ans, correct_ans, 0, match_mode, q_format)
 
-        if verbose:
-            student_str = str(student_ans) if student_ans else 'None'
-            correct_str = str(correct_ans) if not isinstance(correct_ans, list) else f"{correct_ans[0]}..." if len(correct_ans) > 1 else str(correct_ans[0])
-            result_str = "[V]" if is_correct else "[X]"
+                earned_score = sub_score if is_correct else 0
+                total_score += earned_score
 
-            row = f"{pad_string(q_num, 8)}{pad_string(student_str, 25)}{pad_string(correct_str, 35)}{pad_string(match_mode, 12)}{pad_string(result_str, 8)}"
-            print(row)
+                if verbose:
+                    student_str = str(student_ans) if student_ans else 'None'
+                    correct_str = str(correct_ans) if not isinstance(correct_ans, list) else f"{correct_ans[0]}..." if len(correct_ans) > 1 else str(correct_ans[0])
+                    result_str = "[V]" if is_correct else "[X]"
 
-        results[q_num] = {
-            'student_answer': student_ans,
-            'correct_answer': correct_ans,
-            'match_mode': match_mode,
-            'format': q_format,
-            'is_correct': is_correct,
-            'score': earned_score,
-            'max_score': q_score
-        }
+                    row = f"{pad_string(combined_num, 8)}{pad_string(student_str, 25)}{pad_string(correct_str, 35)}{pad_string(match_mode, 12)}{pad_string(result_str, 8)}"
+                    print(row)
+
+                results[combined_num] = {
+                    'student_answer': student_ans,
+                    'correct_answer': correct_ans,
+                    'match_mode': match_mode,
+                    'format': q_format,
+                    'is_correct': is_correct,
+                    'score': earned_score,
+                    'max_score': sub_score
+                }
+        else:
+            q_score = q_info.get('score', 0)
+            max_score += q_score
+
+            student_ans = normalized_student_answers.get(q_num)
+            correct_ans = q_info.get('answer')
+            match_mode = q_info.get('match_mode', 'any')
+            q_format = q_info.get('format', 'string')
+
+            is_correct = False
+
+            if student_ans is None:
+                is_correct = False
+            elif q_type == 'choice':
+                if match_mode == 'any':
+                    if isinstance(correct_ans, list):
+                        is_correct = student_ans.upper() in [ans.upper() for ans in correct_ans]
+                    else:
+                        is_correct = (student_ans.upper() == str(correct_ans).upper())
+                else:
+                    is_correct = False
+            elif q_type == 'blank':
+                is_correct = check_blank_answer(student_ans, correct_ans, 0, match_mode, q_format)
+
+            earned_score = q_score if is_correct else 0
+            total_score += earned_score
+
+            if verbose:
+                student_str = str(student_ans) if student_ans else 'None'
+                correct_str = str(correct_ans) if not isinstance(correct_ans, list) else f"{correct_ans[0]}..." if len(correct_ans) > 1 else str(correct_ans[0])
+                result_str = "[V]" if is_correct else "[X]"
+
+                row = f"{pad_string(q_num, 8)}{pad_string(student_str, 25)}{pad_string(correct_str, 35)}{pad_string(match_mode, 12)}{pad_string(result_str, 8)}"
+                print(row)
+
+            results[q_num] = {
+                'student_answer': student_ans,
+                'correct_answer': correct_ans,
+                'match_mode': match_mode,
+                'format': q_format,
+                'is_correct': is_correct,
+                'score': earned_score,
+                'max_score': q_score
+            }
 
     if verbose:
         print(f"{'-'*100}")

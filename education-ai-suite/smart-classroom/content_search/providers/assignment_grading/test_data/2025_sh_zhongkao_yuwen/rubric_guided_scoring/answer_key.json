@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "description": "2025 Shanghai Chinese Language Exam Objective Questions Answer Key",
+    "exam_name": "2025 Shanghai Chinese Language Exam",
+    "total_objective_score": 36,
+    "fields": {
+      "type": "Question type: choice=multiple choice, blank=fill in blank, group=question group with sub-questions",
+      "score": "Points for this question or sub-question",
+      "format": "Answer format: string=exact string match, number=numeric match, latex=LaTeX formula match",
+      "match_mode": "Match mode: any=match any one in answer array(default), all=match all answers in order, set=match all answers unordered",
+      "answer": "Standard answer array",
+      "sub_questions": "For group type, contains nested sub-questions"
+    }
+  },
+  "answers": {
+    "1": {
+      "type": "group",
+      "score": 10,
+      "sub_questions": {
+        "(1)": {"type": "blank", "score": 2, "format": "string", "match_mode": "any", "answer": ["阴阳割昏晓"]},
+        "(2)": {"type": "blank", "score": 2, "format": "string", "match_mode": "any", "answer": ["飞鸟相与还"]},
+        "(3)": {"type": "blank", "score": 2, "format": "string", "match_mode": "any", "answer": ["稻花香里说丰年"]},
+        "(4)": {"type": "blank", "score": 4, "format": "string", "match_mode": "all", "answer": ["先天下之忧而忧", "后天下之乐而乐"]}
+      }
+    },
+    "2": { "type": "blank", "score": 2, "format": "string", "match_mode": "any", "answer": ["刘禹锡"]},
+    "3": {
+      "type": "group",
+      "score": 4,
+      "sub_questions": {
+        "(1)": {"type": "choice", "score": 2, "format": "string", "match_mode": "any", "answer": ["B"]},
+        "(2)": {"type": "choice", "score": 2, "format": "string", "match_mode": "any", "answer": ["B"]}
+      }
+    },
+    "4": {"type": "choice", "score": 2, "format": "string", "match_mode": "any", "answer": ["D"]},
+    "6": {"type": "choice", "score": 2, "format": "string", "match_mode": "any", "answer": ["D"]},
+    "7": {"type": "choice", "score": 2, "format": "string", "match_mode": "any", "answer": ["B"]},
+    "9": {"type": "choice", "score": 3, "format": "string", "match_mode": "any", "answer": ["A"]}
+  }
+}
