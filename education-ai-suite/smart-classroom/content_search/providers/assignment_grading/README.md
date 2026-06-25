@@ -21,11 +21,13 @@ pip install -r requirements.txt
 ```bash
 python ocr_services/paddleocr_vl_server.py
 ```
+> Note: Local testing service. Will be replaced by smart-classroom production API.
 
 **VLM Server:**
 ```bash
 python Qwen_services/vlm_server.py
 ```
+> Note: Local testing service. Will be replaced by smart-classroom production API.
 
 ### 4. Run Grading
 ```bash
