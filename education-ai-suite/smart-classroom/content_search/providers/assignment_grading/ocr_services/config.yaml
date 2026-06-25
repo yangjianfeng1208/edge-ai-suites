@@ -4,4 +4,4 @@ server:
 
 model:
   path: "../models/ov_paddleocr-vl-1_6_model"
-  device: "GPU.1"
+  device: "GPU.0"

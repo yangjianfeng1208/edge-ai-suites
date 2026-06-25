@@ -2,12 +2,19 @@
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Create Virtual Environment
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
+```
+
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Edit Configuration
+### 3. Edit Configuration
 ```bash
 # Edit config.yaml to set:
 # - Detection JSON path
@@ -15,21 +22,21 @@ pip install -r requirements.txt
 # - Grading options
 ```
 
-### 3. Start Services
+### 4. Start Services
 
 **OCR Server:**
 ```bash
 python ocr_services/paddleocr_vl_server.py
 ```
-> Note: Local testing service. Will be replaced by smart-classroom production API.
+> Note: **For local testing**. Will be replaced by `smart-classroom` production API.
 
 **VLM Server:**
 ```bash
 python Qwen_services/vlm_server.py
 ```
-> Note: Local testing service. Will be replaced by smart-classroom production API.
+> Note: **For local testing**. Will be replaced by `smart-classroom` production API.
 
-### 4. Run Grading
+### 5. Run Grading
 ```bash
 python main.py
 ```
@@ -44,7 +51,6 @@ python main.py
          ▼
 ┌─────────────────────┐
 │  YOLO Detection     │  ← Detect answer regions
-│  (skip if cached)   │
 └────────┬────────────┘
          │
          ▼
@@ -54,7 +60,7 @@ python main.py
          │
          ▼
 ┌─────────────────────┐
-│  OCR Recognition    │  ← PaddleOCR-VL (GPU)
+│  OCR Recognition    │  ← PaddleOCR-VL (GPU/CPU)
 │  (API call)         │
 └────────┬────────────┘
          │
