@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import json
 import yaml
+from utils.pdf_processor import convert_pdf_to_images, image_to_bytes
 
 BASE_DIR = Path(__file__).parent
 
@@ -22,6 +23,15 @@ def main():
     PDF_DPI = config['ocr']['pdf_dpi']
     OCR_MAX_PIXELS = config['ocr']['max_pixels']
     OCR_MAX_TOKENS = config['ocr']['max_tokens']
+
+    JPEG_QUALITY = config['ocr'].get('jpeg_quality', 85)
+    RESIZE_RATIO = config['ocr'].get('resize_ratio')
+    MAX_IMAGE_WIDTH = config['ocr'].get('max_image_width')
+    MAX_IMAGE_HEIGHT = config['ocr'].get('max_image_height')
+    MAX_IMAGE_PIXELS = config['ocr'].get('max_image_pixels')
+    ENHANCE_CONTRAST = config['ocr'].get('enhance_contrast')
+    ENHANCE_SHARPNESS = config['ocr'].get('enhance_sharpness')
+
     YOLO_CONF = config['detection']['yolo_conf']
     YOLO_IOU = config['detection']['yolo_iou']
     PDF_RENDER_DPI = config['detection']['pdf_render_dpi']
@@ -177,24 +187,20 @@ def main():
             print(f"   Status: {health_data.get('status')}")
             print(f"   Device: {health_data.get('device')}")
 
-            print(f"\n Converting PDF to images...")
-            print(f"   DPI: {PDF_DPI}")
-            images = convert_from_path(PDF_PATH, dpi=PDF_DPI)
-            print(f"   Total pages: {len(images)}")
-            if images:
-                print(f"   Image size: {images[0].width}x{images[0].height} pixels")
-
-            print(f"\n Converting to grayscale...")
-            images_gray = [img.convert("L") for img in images]
-            print(f"   Converted {len(images_gray)} pages to grayscale")
-
-            if SAVE_PDF_IMAGES:
-                pdf_images_dir = OUTPUT_BASE / "pdf_images"
-                pdf_images_dir.mkdir(parents=True, exist_ok=True)
-                for idx, img_gray in enumerate(images_gray, 1):
-                    img_path = pdf_images_dir / f"page_{idx}.jpg"
-                    img_gray.save(img_path, "JPEG", quality=85, optimize=True)
-                print(f"   PDF images saved to: {pdf_images_dir}")
+            save_dir = OUTPUT_BASE / "pdf_images" if SAVE_PDF_IMAGES else None
+            images_gray = convert_pdf_to_images(
+                pdf_path=PDF_PATH,
+                dpi=PDF_DPI,
+                grayscale=True,
+                save_dir=save_dir,
+                jpeg_quality=JPEG_QUALITY,
+                max_pixels=MAX_IMAGE_PIXELS,
+                max_width=MAX_IMAGE_WIDTH,
+                max_height=MAX_IMAGE_HEIGHT,
+                resize_ratio=RESIZE_RATIO,
+                enhance_contrast=ENHANCE_CONTRAST,
+                enhance_sharpness=ENHANCE_SHARPNESS
+            )
 
             print(f"\n Running OCR via API on each page...")
             print(f"   Max pixels: {OCR_MAX_PIXELS:,}")

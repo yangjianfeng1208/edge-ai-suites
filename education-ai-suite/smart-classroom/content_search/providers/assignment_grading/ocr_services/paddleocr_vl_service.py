@@ -7,7 +7,8 @@ import time
 
 
 class PaddleOCRVLService:
-    def __init__(self, model_path, device="CPU"):
+    def __init__(self, model_path, device="CPU", llm_int4_compress=False, llm_int8_compress=True,
+                 vision_int8_quant=False, llm_int8_quant=True):
         self.model_path = Path(model_path)
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model not found: {model_path}")
@@ -21,16 +22,17 @@ class PaddleOCRVLService:
 
         print(f"Loading PaddleOCR-VL model from {model_path}...")
         print(f"Target device: {self.device}")
+        print(f"Quantization: INT4={llm_int4_compress}, INT8={llm_int8_compress}")
 
         load_start = time.time()
         self.model = OVPaddleOCRVLForCausalLM(
             core=self.core,
             ov_model_path=str(self.model_path),
             device=self.device,
-            llm_int4_compress=False,
-            llm_int8_compress=True,
-            vision_int8_quant=False,
-            llm_int8_quant=True,
+            llm_int4_compress=llm_int4_compress,
+            llm_int8_compress=llm_int8_compress,
+            vision_int8_quant=vision_int8_quant,
+            llm_int8_quant=llm_int8_quant,
             llm_infer_list=[],
             vision_infer=[]
         )

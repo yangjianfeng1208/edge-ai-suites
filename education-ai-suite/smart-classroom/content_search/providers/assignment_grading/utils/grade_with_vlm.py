@@ -74,7 +74,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
             score = example.get('score', 0)
             prompt += f"\nStudent answer: {ans[:50]}... → Score: {score} points"
 
-    prompt += f"\n\nReview the student's handwritten answer in the image and grade it.\n\n**Important: No matter how long your analysis, you must output at the end:**\nTotal Score: X points\n\n(where X is the final score, max {max_score} points)\n"
+    prompt += f"\n\nReview the student's handwritten answer in the image and grade it.\n\n**IMPORTANT - Required Output Format:**\n\nYou MUST provide:\n1. **Analysis**: Check each grading criterion listed above, explain which ones the student met and which ones were missed (at least 3-5 sentences)\n2. **Scoring Breakdown**: Show points earned for each criterion\n3. **Final Score**: End with 'Total Score: X points' (where X is 0-{max_score})\n\nDO NOT skip the analysis section. Your response must be detailed and thorough.\n"
 
     image_base64 = encode_image_to_base64(answer_image_path)
 
@@ -87,6 +87,8 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
 
 
 def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_retries=2):
+    import time
+
     print(f"    Calling local VLM: {api_url}")
 
     payload = {
@@ -94,7 +96,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
         "messages": [
             {
                 "role": "system",
-                "content": "You are a strict exam grader. You must strictly check each criterion in the grading rubric. Do not guess the process based on the final answer, and do not fill in steps the student omitted. Output the grading result directly without showing your reasoning process."
+                "content": "You are a strict exam grader. You must:\n1. Carefully read the student's handwritten answer in the image\n2. Check each criterion in the grading rubric one by one\n3. Explain which criteria are met and which are not\n4. Do not guess steps the student omitted\n5. Provide detailed analysis before giving the final score\n6. End with 'Total Score: X points' where X is the final score"
             },
             {
                 "role": "user",
@@ -113,18 +115,25 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
             }
         ],
         "max_tokens": 4096,
-        "temperature": 0.0
+        "temperature": 0.1  # 轻微随机性，避免模型过于简短
     }
 
     import requests
     for attempt in range(max_retries):
         try:
             print(f"    Attempt {attempt + 1}/{max_retries}...")
+
+            # 开始计时
+            start_time = time.time()
+
             response = requests.post(
                 f"{api_url}/v1/chat/completions",
                 json=payload,
                 timeout=300
             )
+
+            # 计算耗时
+            elapsed_time = time.time() - start_time
 
             if response.status_code != 200:
                 print(f"     Error response ({response.status_code}): {response.text[:500]}")
@@ -133,10 +142,18 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
 
             vlm_output = data.get('choices', [{}])[0].get('message', {}).get('content', '')
 
+            # 检查输出长度，如果太短可能是模型偷懒了
+            if len(vlm_output) < 100 and attempt < max_retries - 1:
+                print(f"\n     ⚠️  Output too short ({len(vlm_output)} chars), retrying with stronger prompt...")
+                # 下次重试时会使用同样的 prompt，但有随机性可能会不同
+                continue
+
             print(f"\n    [VLM Raw Output]")
             print(f"    {'-'*60}")
             print(f"    {vlm_output[:500]}..." if len(vlm_output) > 500 else vlm_output)
-            print(f"    {'-'*60}\n")
+            print(f"    {'-'*60}")
+            print(f"    ⏱️  Inference time: {elapsed_time:.2f}s")
+            print(f"    📝 Output length: {len(vlm_output)} chars\n")
 
             final_score_patterns = [
                 (r'Total Score[：:=\s]*(\d+)\s*points?', 'Total Score'),
@@ -230,10 +247,15 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
 
 
 def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', api_url='http://127.0.0.1:9900'):
+    import time
+
     print(f"\n{'='*80}")
     print("VLM Automatic Grading")
     print(f"{'='*80}")
     print(f"VLM API: {api_url}")
+
+    # 记录总体开始时间
+    total_start_time = time.time()
 
     print(f"\n[1/5] Loading exam metadata...")
     exam_meta_path = Path(rubric_dir) / "exam_meta.json"
@@ -394,10 +416,18 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     with open(output_json, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
+    # 计算总耗时
+    total_elapsed = time.time() - total_start_time
+    graded_count = sum(1 for r in grading_results if r.get('vlm_score') is not None)
+    avg_time_per_question = total_elapsed / graded_count if graded_count > 0 else 0
+
     print(f"\n{'='*80}")
     print("Grading completed")
     print(f"{'='*80}")
     print(f"Subjective total score: {total_score}/{max_total}")
     print(f"Objective questions skipped: {skipped_count}")
+    print(f"Subjective questions graded: {graded_count}")
+    print(f"⏱️  Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
+    print(f"⏱️  Average time per question: {avg_time_per_question:.1f}s")
     print(f"Output JSON: {output_json}")
     print(f"Detailed report: {summary_file}")

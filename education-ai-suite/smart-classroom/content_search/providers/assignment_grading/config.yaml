@@ -3,7 +3,8 @@ grading:
   skip_yolo_detection: false
 
 detection:
-  json_path: "./test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
+  # json_path: "./test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
+  json_path: "./test_data/2025_sh_zhongkao_math/papers/student1/yolo_detections.json"
   yolo_conf: 0.15
   yolo_iou: 0.5
   pdf_render_dpi: 300
@@ -15,6 +16,15 @@ ocr:
   max_pixels: 10000000
   max_tokens: 4096
 
+  # Image processing optimization (speed vs quality balance)
+  jpeg_quality: 85          # JPEG quality (60-95), lower=faster
+  resize_ratio: null        # Resize ratio (e.g., 0.5 for 50% size), null=no resize
+  max_image_width: null     # Max image width in pixels, null=no limit
+  max_image_height: null    # Max image height in pixels, null=no limit
+  max_image_pixels: null    # Max total pixels (overrides pdf max_pixels), null=use max_pixels
+  enhance_contrast: null    # Contrast enhancement (1.0=no change, 1.2=+20%), null=no enhancement
+  enhance_sharpness: null   # Sharpness enhancement (1.0=no change, 1.5=sharper), null=no enhancement
+
 vlm_service:
   base_url: "http://127.0.0.1:9900"
   timeout: 300
@@ -24,3 +34,11 @@ ocr_service:
   base_url: "http://127.0.0.1:9901"
   timeout: 300
   max_retries: 2
+
+ocr_model:
+  path: "models/ov_paddleocr-vl-1_6_model"
+  device: "GPU.0"
+  llm_int4_compress: false
+  llm_int8_compress: true
+  vision_int8_quant: false
+  llm_int8_quant: true

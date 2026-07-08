@@ -16,7 +16,11 @@ ocr_service: Optional[PaddleOCRVLService] = None
 server_config = {
     'model_path': None,
     'device': None,
-    'port': None
+    'port': None,
+    'llm_int4_compress': False,
+    'llm_int8_compress': True,
+    'vision_int8_quant': False,
+    'llm_int8_quant': True
 }
 
 
@@ -26,6 +30,10 @@ async def lifespan(app: FastAPI):
     model_path = server_config['model_path']
     device = server_config['device']
     port = server_config['port']
+    llm_int4 = server_config['llm_int4_compress']
+    llm_int8 = server_config['llm_int8_compress']
+    vision_int8 = server_config['vision_int8_quant']
+    llm_int8_quant = server_config['llm_int8_quant']
 
     print(f"\n{'='*80}")
     print(f"Starting PaddleOCR-VL Server...")
@@ -34,7 +42,14 @@ async def lifespan(app: FastAPI):
     print(f"{'='*80}\n")
 
     try:
-        ocr_service = PaddleOCRVLService(model_path=model_path, device=device)
+        ocr_service = PaddleOCRVLService(
+            model_path=model_path,
+            device=device,
+            llm_int4_compress=llm_int4,
+            llm_int8_compress=llm_int8,
+            vision_int8_quant=vision_int8,
+            llm_int8_quant=llm_int8_quant
+        )
         print(f"\n{'='*80}")
         print(f"Server Ready!")
         print(f"  API Docs: http://localhost:{port}/docs")
@@ -207,6 +222,11 @@ def main():
     default_host = cfg['server']['host']
     default_port = cfg['server']['port']
 
+    llm_int4 = cfg['model'].get('llm_int4_compress', False)
+    llm_int8 = cfg['model'].get('llm_int8_compress', True)
+    vision_int8 = cfg['model'].get('vision_int8_quant', False)
+    llm_int8_quant = cfg['model'].get('llm_int8_quant', True)
+
     parser = argparse.ArgumentParser(description="PaddleOCR-VL API Server")
     parser.add_argument(
         "--model",
@@ -240,6 +260,10 @@ def main():
     server_config['model_path'] = str(model_path)
     server_config['device'] = args.device
     server_config['port'] = args.port
+    server_config['llm_int4_compress'] = llm_int4
+    server_config['llm_int8_compress'] = llm_int8
+    server_config['vision_int8_quant'] = vision_int8
+    server_config['llm_int8_quant'] = llm_int8_quant
 
     uvicorn.run(
         app,

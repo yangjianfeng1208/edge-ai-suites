@@ -3,5 +3,20 @@ server:
   port: 9901
 
 model:
-  path: "../models/ov_paddleocr-vl-1_6_model"
-  device: "GPU.0"
+  # path: "../models/ov_paddleocr-vl-1_6_model"
+  path: "../models/ov_paddleocr-vl-1_6_int4"
+  device: "GPU.1"
+  llm_int4_compress: true
+  llm_int8_compress: false
+  vision_int8_quant: false
+  llm_int8_quant: true
+
+layout_detection:
+  model_path: "../models/PP-DocLayoutV2-ov"
+  device: "GPU.1"
+  precision: "fp32"
+  threshold: 0.3
+  # input_path: "../outputs/2025_sh_zhongkao_math/pdf_images"
+  input_path: "./input"
+  output_dir: "./output"
+  visualize: true
