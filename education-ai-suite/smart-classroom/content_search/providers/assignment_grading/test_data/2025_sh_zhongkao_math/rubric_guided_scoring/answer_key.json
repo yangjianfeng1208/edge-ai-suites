@@ -1,16 +1,28 @@
 {
   "metadata": {
-    "description": "Objective questions answer key configuration",
-    "fields": {
-      "alias": "Question ID alias, e.g. Q1_1 = section 1 question 1",
-      "type": "Question type: choice=multiple choice, blank=fill in blank",
-      "score": "Points for this question",
-      "format": "Answer format: string=exact string match, number=numeric match, latex=LaTeX formula match",
-      "match_mode": "Match mode: any=match any one in answer array(default), all=match all answers in order, set=match all answers unordered",
-      "answer": "Standard answer array. Can contain multiple equivalent forms (simplified/LaTeX/with units). any mode matches any one, all/set mode requires all matches"
+    "description": "Answer key and grading configuration",
+    "version": "2.0",
+    "structure": {
+      "objective_questions": "Automatically graded questions (choice, blank)",
+      "subjective_questions": "Manually or VLM graded questions with detailed rubrics"
+    },
+    "objective_fields": {
+      "alias": "Question ID alias (e.g., Q1_1)",
+      "type": "choice | blank | true_false",
+      "score": "Total points",
+      "format": "string | number | latex",
+      "match_mode": "any | all | set",
+      "answer": "Array of acceptable answers"
+    },
+    "subjective_fields": {
+      "alias": "Question ID alias",
+      "type": "calculation | proof | essay | application | comprehensive | analysis",
+      "score": "Total points",
+      "rubric": "Path to detailed grading rubric JSON file"
     }
   },
-  "answers": {
+
+  "objective_questions": {
     "1": {"alias": "Q1_1", "type": "choice", "score": 4, "format": "string", "match_mode": "any", "answer": ["A"]},
     "2": {"alias": "Q1_2", "type": "choice", "score": 4, "format": "string", "match_mode": "any", "answer": ["B"]},
     "3": {"alias": "Q1_3", "type": "choice", "score": 4, "format": "string", "match_mode": "any", "answer": ["D"]},
@@ -29,5 +41,12 @@
     "16": {"alias": "Q2_10", "type": "blank", "score": 3, "format": "latex", "match_mode": "any", "answer": ["2.5 \\times 10^{9}"]},
     "17": {"alias": "Q2_11", "type": "blank", "score": 3, "format": "latex", "match_mode": "any", "answer": ["\\frac{2\\sqrt{3}}{3}"]},
     "18": {"alias": "Q2_12", "type": "blank", "score": 3, "format": "latex", "match_mode": "any", "answer": ["36^{\\circ}", "108^{\\circ}"]}
+  },
+
+  "subjective_questions": {
+    "19": {"alias": "Q3_1", "type": "calculation", "score": 10, "rubric": "question19.json"},
+    "20": {"alias": "Q3_2", "type": "proof", "score": 10, "rubric": "question20.json"},
+    "21": {"alias": "Q3_3", "type": "application", "score": 10, "rubric": "question21.json"},
+    "22": {"alias": "Q4_1", "type": "comprehensive", "score": 12, "rubric": "question22.json"}
   }
 }

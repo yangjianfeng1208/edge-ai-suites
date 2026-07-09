@@ -85,6 +85,28 @@ class OCRResponse(BaseModel):
     inference_time: Optional[float] = None
 
 
+class Region(BaseModel):
+    bbox: list[float] = Field(..., description="Bounding box [x1, y1, x2, y2]")
+    type: str = Field(default="text", description="Region type: text, table, formula, chart")
+    region_id: str = Field(..., description="Unique region identifier")
+
+
+class RegionResult(BaseModel):
+    region_id: str
+    type: str
+    bbox: list[float]
+    content: str
+    inference_time: float
+
+
+class RegionsOCRResponse(BaseModel):
+    success: bool
+    results: Optional[list[RegionResult]] = None
+    error: Optional[str] = None
+    total_inference_time: Optional[float] = None
+    num_regions: Optional[int] = None
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -206,6 +228,159 @@ async def ocr_base64(request: OCRRequest):
 
     except Exception as e:
         return OCRResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@app.post("/ocr/regions", response_model=RegionsOCRResponse)
+async def ocr_regions(
+    file: UploadFile = File(..., description="Full page image file"),
+    regions: str = Form(..., description="JSON array of regions to process"),
+    max_new_tokens: int = Form(default=4096, ge=512, le=8192),
+    max_pixels: Optional[int] = Form(default=10000000, ge=1000000, le=20000000)
+):
+    """
+    OCR endpoint that processes multiple regions in a single image
+
+    This is the standard two-stage approach:
+    1. Layout detection (PP-DocLayout) identifies regions
+    2. Region-based OCR (this endpoint) processes each region with appropriate task
+
+    Args:
+        file: Full page image
+        regions: JSON string array of regions, e.g.:
+            [
+                {"bbox": [x1,y1,x2,y2], "type": "text", "region_id": "r1"},
+                {"bbox": [x1,y1,x2,y2], "type": "table", "region_id": "r2"}
+            ]
+        max_new_tokens: Maximum tokens per region
+        max_pixels: Maximum pixels per region
+
+    Returns:
+        RegionsOCRResponse with results for each region
+    """
+    if ocr_service is None:
+        raise HTTPException(status_code=503, detail="OCR service not initialized")
+
+    try:
+        import time
+        import json
+
+        # Parse regions JSON
+        try:
+            regions_list = json.loads(regions)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid regions JSON: {e}")
+
+        if not isinstance(regions_list, list):
+            raise HTTPException(status_code=400, detail="regions must be a JSON array")
+
+        # Load full image
+        contents = await file.read()
+        full_image = Image.open(io.BytesIO(contents))
+
+        print(f"\n{'='*80}")
+        print(f"Processing {len(regions_list)} regions from image")
+        print(f"  Image size: {full_image.size}")
+        print(f"{'='*80}")
+
+        # Process each region
+        results = []
+        total_start = time.time()
+
+        # Task mapping
+        type_to_task = {
+            'text': 'ocr',
+            'table': 'table',
+            'display_formula': 'formula',
+            'inline_formula': 'formula',
+            'formula': 'formula',
+            'chart': 'chart',
+            'paragraph_title': 'ocr',
+            'title': 'ocr',
+            'doc_title': 'ocr'
+        }
+
+        for i, region in enumerate(regions_list, 1):
+            try:
+                # Validate region
+                if not all(k in region for k in ['bbox', 'region_id']):
+                    print(f"  [Region {i}] Skipped: missing required fields")
+                    continue
+
+                bbox = region['bbox']
+                region_type = region.get('type', 'text')
+                region_id = region['region_id']
+
+                # Map region type to OCR task
+                task = type_to_task.get(region_type, 'ocr')
+
+                # Crop region
+                x1, y1, x2, y2 = bbox
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+                # Validate bbox
+                if x2 <= x1 or y2 <= y1:
+                    print(f"  [Region {i}/{len(regions_list)}] {region_id}: Invalid bbox")
+                    continue
+
+                cropped = full_image.crop((x1, y1, x2, y2))
+
+                print(f"  [Region {i}/{len(regions_list)}] {region_id}")
+                print(f"    Type: {region_type} → Task: {task}")
+                print(f"    BBox: [{x1},{y1},{x2},{y2}]")
+                print(f"    Size: {cropped.size}")
+
+                # OCR this region
+                region_start = time.time()
+
+                content = ocr_service.ocr_image(
+                    cropped,
+                    task=task,
+                    max_new_tokens=max_new_tokens,
+                    max_pixels=max_pixels
+                )
+
+                region_time = time.time() - region_start
+
+                print(f"    Time: {region_time:.2f}s")
+                print(f"    Content preview: {content[:100]}..." if len(content) > 100 else f"    Content: {content}")
+
+                # Add result
+                results.append(RegionResult(
+                    region_id=region_id,
+                    type=region_type,
+                    bbox=bbox,
+                    content=content,
+                    inference_time=region_time
+                ))
+
+            except Exception as e:
+                print(f"  [Region {i}] Error: {e}")
+                # Continue processing other regions
+                continue
+
+        total_time = time.time() - total_start
+
+        print(f"\n{'='*80}")
+        print(f"Completed: {len(results)}/{len(regions_list)} regions processed")
+        print(f"Total time: {total_time:.2f}s")
+        print(f"{'='*80}\n")
+
+        return RegionsOCRResponse(
+            success=True,
+            results=results,
+            total_inference_time=total_time,
+            num_regions=len(results)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return RegionsOCRResponse(
             success=False,
             error=str(e)
         )

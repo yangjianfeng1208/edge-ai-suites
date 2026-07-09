@@ -13,10 +13,17 @@ model:
 
 layout_detection:
   model_path: "../models/PP-DocLayoutV2-ov"
-  device: "GPU.1"
+  device: "NPU"
   precision: "fp32"
   threshold: 0.3
   # input_path: "../outputs/2025_sh_zhongkao_math/pdf_images"
   input_path: "./input"
   output_dir: "./output"
   visualize: true
+
+detection_service:
+  host: "0.0.0.0"
+  port: 9902
+  base_url: "http://127.0.0.1:9902"
+  timeout: 300
+  max_retries: 2

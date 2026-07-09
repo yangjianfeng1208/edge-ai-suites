@@ -33,7 +33,13 @@ def parse_objective_answers_from_ocr(ocr_text_path, answer_key_path):
     with open(answer_key_path, 'r', encoding='utf-8') as f:
         answer_key_data = json.load(f)
 
-    answer_key = answer_key_data.get('answers', answer_key_data)
+    # Support both old format (answers) and new format (objective_questions)
+    if 'objective_questions' in answer_key_data:
+        answer_key = answer_key_data['objective_questions']
+    elif 'answers' in answer_key_data:
+        answer_key = answer_key_data['answers']
+    else:
+        answer_key = answer_key_data
 
     student_answers = {}
 
@@ -285,7 +291,10 @@ def grade_objective_questions(student_answers, answer_key, verbose=False):
     total_score = 0
     max_score = 0
 
-    if 'answers' in answer_key and 'metadata' in answer_key:
+    # Support both old format (answers) and new format (objective_questions)
+    if 'objective_questions' in answer_key:
+        answer_key_data = answer_key['objective_questions']
+    elif 'answers' in answer_key and 'metadata' in answer_key:
         answer_key_data = answer_key['answers']
     else:
         answer_key_data = answer_key

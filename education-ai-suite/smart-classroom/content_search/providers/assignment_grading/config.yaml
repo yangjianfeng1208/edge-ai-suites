@@ -1,13 +1,15 @@
-grading:
-  skip_subjective: true
-  skip_yolo_detection: false
+pipeline:
+  # Exam configuration (can be overridden by command line arguments)
+  rubric_dir: "./test_data/2025_sh_zhongkao_math/rubric_guided_scoring"  # Answer key and grading rubrics (shared by all students)
+  papers_dir: "./test_data/2025_sh_zhongkao_math/papers"                 # Directory containing all student papers (student1/, student2/, ...)
 
-detection:
-  # json_path: "./test_data/2025_sh_zhongkao_yuwen/papers/student1/yolo_detections.json"
-  json_path: "./test_data/2025_sh_zhongkao_math/papers/student1/yolo_detections.json"
-  yolo_conf: 0.15
-  yolo_iou: 0.5
-  pdf_render_dpi: 300
+  # Processing steps control
+  skip_subjective: false       # Skip subjective grading (VLM-based)
+  skip_objective: false       # Skip objective grading (rule-based)
+  skip_ocr: false             # Skip OCR if results already exist
+
+  # PDF rendering
+  pdf_render_dpi: 300         # DPI for PDF rendering (higher = better quality, slower)
 
 ocr:
   use_cached: false
@@ -35,10 +37,59 @@ ocr_service:
   timeout: 300
   max_retries: 2
 
-ocr_model:
-  path: "models/ov_paddleocr-vl-1_6_model"
-  device: "GPU.0"
-  llm_int4_compress: false
-  llm_int8_compress: true
-  vision_int8_quant: false
-  llm_int8_quant: true
+detection_service:
+  base_url: "http://127.0.0.1:9902"
+  timeout: 300
+  max_retries: 2
+
+  # Detection filtering and processing
+  target_labels: ["text", "display_formula", "table", 
+                  "title", "doc_title", "paragraph_title", 
+                  "aside_text", "vertical_text",
+                  "formula_number"
+                 ]      # Labels to detect: text, table, image, display_formula, etc.
+  min_score: 0.5               # Minimum confidence score (0-1)
+  sort_boxes: true             # Sort boxes top-to-bottom
+  expand_margin: 10            # Expand box margins in pixels
+  merge_overlapping: false     # Merge overlapping boxes
+  iou_threshold: 0.7           # IoU threshold for merging (if enabled)
+
+  # Visualization
+  save_visualizations: true    # Save images with detection boxes drawn
+
+# target_labels: [
+#   "text",              # 文本段落（最常用，主观题答案）
+#   "table",             # 表格
+#   "image",             # 图片
+#   "display_formula",   # 独立公式（居中显示的公式）
+#   "inline_formula",    # 行内公式（嵌入文本中的公式）
+#   "chart",             # 图表（柱状图、折线图等）
+  
+#   # 标题类
+#   "title",             # 通用标题
+#   "doc_title",         # 文档标题
+#   "paragraph_title",   # 段落标题
+#   "figure_title",      # 图片标题
+  
+#   # 页眉页脚类
+#   "header",            # 页眉
+#   "footer",            # 页脚
+#   "header_image",      # 页眉图片
+#   "footer_image",      # 页脚图片
+  
+#   # 学术文档类
+#   "abstract",          # 摘要
+#   "reference",         # 参考文献
+#   "reference_content", # 参考文献内容
+#   "footnote",          # 脚注
+#   "vision_footnote",   # 可视化脚注
+  
+#   # 特殊内容类
+#   "algorithm",         # 算法伪代码
+#   "content",           # 目录
+#   "aside_text",        # 侧边文本
+#   "vertical_text",     # 竖排文字
+#   "seal",              # 印章
+#   "number",            # 编号
+#   "formula_number"     # 公式编号
+# ]
