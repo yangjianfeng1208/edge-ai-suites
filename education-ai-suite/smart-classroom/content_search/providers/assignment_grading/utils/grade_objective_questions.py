@@ -1,18 +1,17 @@
-"""
-Grade Objective Questions
-
-Automatically grades objective questions based on extracted answers.
-"""
+"""Grade Objective Questions - Automatically grades objective questions based on extracted answers"""
 import json
 import re
 from pathlib import Path
 from typing import Dict, List, Tuple
+from utils.text_normalizer import normalize_text
 
 
 def extract_answer(content: str, q_type: str) -> str:
-    """Extract answer from question content"""
+    """Extract answer from question content with NFKC normalization"""
+    content = normalize_text(content)
+
     if q_type == 'choice':
-        match = re.search(r'[（\(]\s*([A-D])\s*[）\)]', content)
+        match = re.search(r'\(\s*([A-D])\s*\)', content)
         if match:
             return match.group(1)
 
@@ -23,10 +22,10 @@ def extract_answer(content: str, q_type: str) -> str:
             answer = answer.replace('\\text{', '').replace('}', '')
             return answer.strip()
 
-        match = re.search(r'[，、]([^，。]+)[。，（]', content)
+        match = re.search(r'[,]([^,.]+)[.,\(]', content)
         if match:
             answer = match.group(1).strip()
-            if len(answer) < 50 and not any(c in answer for c in ['(', ')', '（', '）']):
+            if len(answer) < 50 and '(' not in answer and ')' not in answer:
                 return answer
 
         match = re.search(r'=\s*(.+?)(?:\.|$)', content)
@@ -39,30 +38,17 @@ def extract_answer(content: str, q_type: str) -> str:
 
 
 def check_answer(extracted: str, standard: List[str], match_mode: str = 'any') -> bool:
-    """
-    Check if extracted answer matches standard answer
-
-    Args:
-        extracted: Extracted answer from student work
-        standard: List of acceptable answers
-        match_mode: 'any' (any match), 'all' (all required), 'set' (set equality)
-
-    Returns:
-        True if answer is correct
-    """
+    """Check if extracted answer matches standard answer"""
     if not extracted or not standard:
         return False
 
     if match_mode == 'any':
-        # Any match is acceptable
         return extracted in standard
 
     elif match_mode == 'all':
-        # All standard answers must appear in extracted
         return all(ans in extracted for ans in standard)
 
     elif match_mode == 'set':
-        # Exact set match (order doesn't matter)
         extracted_set = set(extracted.split(','))
         standard_set = set(standard)
         return extracted_set == standard_set
@@ -73,24 +59,14 @@ def check_answer(extracted: str, standard: List[str], match_mode: str = 'any') -
 def grade_objective_questions(
     ocr_dir: Path,
     answer_key_path: Path,
-    output_dir: Path
+    output_dir: Path,
+    config: Dict = None
 ) -> Dict:
-    """
-    Grade objective questions automatically
-
-    Args:
-        ocr_dir: Directory with OCR results
-        answer_key_path: Path to answer_key.json
-        output_dir: Output directory for grading results
-
-    Returns:
-        Grading results dictionary
-    """
+    """Grade objective questions automatically"""
     print(f"\n{'='*80}")
     print("Grading Objective Questions")
     print(f"{'='*80}")
 
-    # Load answer key
     with open(answer_key_path, 'r', encoding='utf-8') as f:
         answer_key_data = json.load(f)
 
@@ -100,7 +76,6 @@ def grade_objective_questions(
         print("  No objective questions found")
         return {'total_score': 0, 'questions': {}}
 
-    # Load OCR results
     ocr_files = sorted(ocr_dir.glob("page_*_ocr.json"))
     all_regions = []
 
@@ -116,19 +91,13 @@ def grade_objective_questions(
                 'content': result.get('content', '').strip()
             })
 
-    # Find group questions
     group_questions = set()
     for q_id, q_info in objective_questions.items():
         if q_info.get('type') == 'group':
             group_questions.add(q_id)
 
-    # Define instruction section blacklist
-    INSTRUCTION_TITLES = [
-        '考试说明', '注意事项', '考生注意', '答题要求',
-        'instructions', 'directions', 'notice'
-    ]
+    INSTRUCTION_TITLES = config.get('question_parsing', {}).get('instruction_section_keywords', [])
 
-    # Extract question regions
     question_regions = []
     in_instruction_section = False
     current_group_question = None
@@ -137,7 +106,6 @@ def grade_objective_questions(
         content = region['content'].strip()
         region_type = region.get('type', 'text')
 
-        # Check section titles
         if region_type in ['paragraph_title', 'doc_title']:
             is_instruction = any(kw in content for kw in INSTRUCTION_TITLES)
             if is_instruction:
@@ -152,7 +120,6 @@ def grade_objective_questions(
         if region_type != 'text':
             continue
 
-        # Try sub-question patterns
         sub_patterns = [
             (r'^(\d+)[）\)]', 'simple'),
             (r'^[（\(](\d+)[）\)]', 'parenthesis'),
@@ -170,7 +137,7 @@ def grade_objective_questions(
                     else:
                         matched = True
                         break
-                else:  # compound
+                else:
                     parent_num = match.group(1)
                     sub_num = match.group(2)
                     q_num = f"{parent_num}({sub_num})"
@@ -184,7 +151,6 @@ def grade_objective_questions(
                 break
 
         if not matched:
-            # Main question pattern
             match = re.match(r'^(\d+)\.', content)
             if match:
                 q_num = match.group(1)
@@ -198,7 +164,6 @@ def grade_objective_questions(
                 if region_type in ['paragraph_title', 'doc_title']:
                     current_group_question = None
 
-    # Flatten questions (expand groups)
     flat_questions = []
     for q_id in sorted(objective_questions.keys(), key=lambda x: int(x)):
         q_info = objective_questions[q_id]
@@ -226,9 +191,8 @@ def grade_objective_questions(
                 'match_mode': q_info.get('match_mode', 'any')
             })
 
-    # Helper functions for table display
     def display_width(s):
-        """Calculate display width accounting for wide characters (Chinese, etc.)"""
+        """Calculate display width accounting for wide characters"""
         width = 0
         for char in str(s):
             if '一' <= char <= '鿿' or '　' <= char <= '〿':
@@ -238,14 +202,12 @@ def grade_objective_questions(
         return width
 
     def pad_string(s, target_width):
-        """Pad string to target display width"""
         s = str(s)
         current_width = display_width(s)
         if current_width >= target_width:
             return s
         return s + ' ' * (target_width - current_width)
 
-    # Print table header
     print(f"\n{'='*100}")
     print("Objective Question Grading Details")
     print(f"{'='*100}")
@@ -253,7 +215,6 @@ def grade_objective_questions(
     print(header)
     print(f"{'-'*100}")
 
-    # Grade each question
     grading_results = {
         'total_questions': len(flat_questions),
         'total_possible_score': sum(q['score'] for q in flat_questions),
@@ -268,7 +229,6 @@ def grade_objective_questions(
         max_score = q['score']
         match_mode = q['match_mode']
 
-        # Find in OCR
         extracted_answer = None
         ocr_content = None
         page_num = None
@@ -280,16 +240,13 @@ def grade_objective_questions(
                 extracted_answer = extract_answer(ocr_content, q_type)
                 break
 
-        # Check answer
         is_correct = False
         if extracted_answer:
             is_correct = check_answer(extracted_answer, standard_answer, match_mode)
 
-        # Calculate score
         earned_score = max_score if is_correct else 0
         grading_results['total_score'] += earned_score
 
-        # Print table row
         student_str = str(extracted_answer) if extracted_answer else 'None'
         if len(student_str) > 33:
             student_str = student_str[:30] + '...'
@@ -310,7 +267,6 @@ def grade_objective_questions(
         row = f"{pad_string(full_id, 8)}{pad_string(result_str, 10)}{pad_string(match_mode, 12)}{pad_string(correct_str, 35)}{pad_string(student_str, 35)}"
         print(row)
 
-        # Record result
         grading_results['questions'][full_id] = {
             'type': q_type,
             'standard_answer': standard_answer,
@@ -321,20 +277,16 @@ def grade_objective_questions(
             'page': page_num
         }
 
-    # Print table footer
     print(f"{'-'*100}")
     print(f"Total Score: {grading_results['total_score']}/{grading_results['total_possible_score']}")
     print(f"{'='*100}\n")
 
-    # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # JSON output
     json_output = output_dir / 'objective_grading_results.json'
     with open(json_output, 'w', encoding='utf-8') as f:
         json.dump(grading_results, f, ensure_ascii=False, indent=2)
 
-    # Text report
     txt_output = output_dir / 'objective_grading_report.txt'
     with open(txt_output, 'w', encoding='utf-8') as f:
         f.write("="*80 + "\n")
@@ -349,11 +301,10 @@ def grade_objective_questions(
             f.write("-"*80 + "\n")
             f.write(f"Standard Answer: {q_result['standard_answer']}\n")
             f.write(f"Student Answer:  {q_result['extracted_answer'] or 'NOT FOUND'}\n")
-            f.write(f"Status: {'✓ CORRECT' if q_result['is_correct'] else '✗ INCORRECT'}\n")
+            f.write(f"Status: {'CORRECT' if q_result['is_correct'] else 'INCORRECT'}\n")
             f.write(f"Score: {q_result['earned_score']}/{q_result['max_score']}\n")
             f.write("\n" + "="*80 + "\n\n")
 
-        # Summary
         f.write("="*80 + "\n")
         f.write("Summary\n")
         f.write("="*80 + "\n")

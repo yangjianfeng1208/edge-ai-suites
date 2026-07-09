@@ -115,7 +115,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
             }
         ],
         "max_tokens": 4096,
-        "temperature": 0.1  # 轻微随机性，避免模型过于简短
+        "temperature": 0.1
     }
 
     import requests
@@ -123,7 +123,6 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
         try:
             print(f"    Attempt {attempt + 1}/{max_retries}...")
 
-            # 开始计时
             start_time = time.time()
 
             response = requests.post(
@@ -132,7 +131,6 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
                 timeout=300
             )
 
-            # 计算耗时
             elapsed_time = time.time() - start_time
 
             if response.status_code != 200:
@@ -142,18 +140,16 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
 
             vlm_output = data.get('choices', [{}])[0].get('message', {}).get('content', '')
 
-            # 检查输出长度，如果太短可能是模型偷懒了
             if len(vlm_output) < 100 and attempt < max_retries - 1:
-                print(f"\n     ⚠️  Output too short ({len(vlm_output)} chars), retrying with stronger prompt...")
-                # 下次重试时会使用同样的 prompt，但有随机性可能会不同
+                print(f"\n     WARNING: Output too short ({len(vlm_output)} chars), retrying with stronger prompt...")
                 continue
 
             print(f"\n    [VLM Raw Output]")
             print(f"    {'-'*60}")
             print(f"    {vlm_output[:500]}..." if len(vlm_output) > 500 else vlm_output)
             print(f"    {'-'*60}")
-            print(f"    ⏱️  Inference time: {elapsed_time:.2f}s")
-            print(f"    📝 Output length: {len(vlm_output)} chars\n")
+            print(f"    Inference time: {elapsed_time:.2f}s")
+            print(f"    Output length: {len(vlm_output)} chars\n")
 
             final_score_patterns = [
                 (r'Total Score[：:=\s]*(\d+)\s*points?', 'Total Score'),
@@ -254,7 +250,6 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     print(f"{'='*80}")
     print(f"VLM API: {api_url}")
 
-    # 记录总体开始时间
     total_start_time = time.time()
 
     print(f"\n[1/5] Loading exam metadata...")
@@ -416,7 +411,6 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     with open(output_json, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
-    # 计算总耗时
     total_elapsed = time.time() - total_start_time
     graded_count = sum(1 for r in grading_results if r.get('vlm_score') is not None)
     avg_time_per_question = total_elapsed / graded_count if graded_count > 0 else 0
@@ -427,7 +421,7 @@ def grade_with_vlm(processed_json, rubric_dir, output_json, vlm_model='local', a
     print(f"Subjective total score: {total_score}/{max_total}")
     print(f"Objective questions skipped: {skipped_count}")
     print(f"Subjective questions graded: {graded_count}")
-    print(f"⏱️  Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
-    print(f"⏱️  Average time per question: {avg_time_per_question:.1f}s")
+    print(f"Total time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
+    print(f"Average time per question: {avg_time_per_question:.1f}s")
     print(f"Output JSON: {output_json}")
     print(f"Detailed report: {summary_file}")

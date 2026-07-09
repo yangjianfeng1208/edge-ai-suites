@@ -552,7 +552,8 @@ def main():
             extract_questions_from_ocr(
                 ocr_dir=STEP2_OCR_DIR,
                 answer_key_path=ANSWER_KEY,
-                output_txt=OBJECTIVE_QUESTIONS_TXT
+                output_txt=OBJECTIVE_QUESTIONS_TXT,
+                config=config
             )
 
             print(f"\n  Objective questions extracted: {OBJECTIVE_QUESTIONS_TXT}")
@@ -563,7 +564,8 @@ def main():
             objective_results = grade_objective_questions(
                 ocr_dir=STEP2_OCR_DIR,
                 answer_key_path=ANSWER_KEY,
-                output_dir=STEP4_OBJECTIVE_DIR
+                output_dir=STEP4_OBJECTIVE_DIR,
+                config=config
             )
 
             step_timings[f'Step {step} - Objective Grading'] = time.time() - step_start_time

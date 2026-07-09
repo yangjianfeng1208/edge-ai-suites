@@ -6,7 +6,7 @@ pipeline:
   # Processing steps control
   skip_subjective: false       # Skip subjective grading (VLM-based)
   skip_objective: false       # Skip objective grading (rule-based)
-  skip_ocr: false             # Skip OCR if results already exist
+  skip_ocr: true             # Skip OCR if results already exist
 
   # PDF rendering
   pdf_render_dpi: 300         # DPI for PDF rendering (higher = better quality, slower)
@@ -56,6 +56,29 @@ detection_service:
 
   # Visualization
   save_visualizations: true    # Save images with detection boxes drawn
+
+# Question parsing configuration
+question_parsing:
+  # Section titles to skip (instruction sections that are not questions)
+  instruction_section_keywords:
+    - "考试说明"
+    - "注意事项"
+    - "考生注意"
+    - "答题要求"
+    - "考场规则"
+    - "作答须知"
+    - "填写说明"
+    - "instructions"
+    - "directions"
+    - "notice"
+
+  # Question number patterns (for detecting question starts)
+  # These regex patterns identify question numbers in OCR text
+  question_patterns:
+    main_question: "^(\\d+)\\."                    # Main question: "1.", "2."
+    sub_question_simple: "^(\\d+)[）\\)]"          # Sub-question: "1）", "1)"
+    sub_question_parenthesis: "^[（\\(](\\d+)[）\\)]"  # Sub-question: "(1)", "（1）"
+    sub_question_compound: "^(\\d+)[\\.\\s]*[（\\(](\\d+)[）\\)]"  # Compound: "1.(1)", "1 (1)"
 
 # target_labels: [
 #   "text",              # 文本段落（最常用，主观题答案）
