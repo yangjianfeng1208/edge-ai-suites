@@ -150,7 +150,7 @@ def main():
         print(f"[Step {step}/{total}] Layout Detection (PP-DocLayout)")
         print(f"{'='*80}")
 
-        from utils.pdf_utils import render_pdf_to_images
+        from utils.pdf_processor import render_pdf_to_images
         from utils.detection_client import (
             check_service_health, detect_page_layout,
             merge_overlapping_boxes, draw_detection_boxes
@@ -296,7 +296,7 @@ def main():
 
         try:
             import requests
-            from utils.pdf_utils import render_pdf_to_images
+            from utils.pdf_processor import render_pdf_to_images
 
             print(f"\nChecking OCR server health...")
             print(f"  URL: {OCR_API_URL}")
@@ -491,7 +491,7 @@ def main():
                 print(f"\n[Part 2] Locating subjective question answer regions...")
 
                 # Load page images for visualization
-                from utils.pdf_utils import render_pdf_to_images
+                from utils.pdf_processor import render_pdf_to_images
                 print(f"  Loading page images for visualization...")
                 pages = render_pdf_to_images(PDF_PATH, dpi=PDF_RENDER_DPI)
                 page_images = {p['page_num']: p['image'] for p in pages}
@@ -598,7 +598,7 @@ def main():
         else:
             try:
                 # Load page images for cropping
-                from utils.pdf_utils import render_pdf_to_images
+                from utils.pdf_processor import render_pdf_to_images
                 print(f"\nLoading page images...")
                 pages = render_pdf_to_images(PDF_PATH, dpi=PDF_RENDER_DPI)
                 page_images = {p['page_num']: p['image'] for p in pages}
