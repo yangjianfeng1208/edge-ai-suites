@@ -526,6 +526,10 @@ def main():
         if not STEP2_OCR_DIR.exists():
             print(f"  OCR directory not found: {STEP2_OCR_DIR}")
 
+    # Initialize grading results
+    objective_results = None
+    subjective_results = None
+
     step += 1
     step_start_time = time.time()
     print(f"\n{'='*80}")
@@ -556,7 +560,7 @@ def main():
             # Then, grade them automatically
             print(f"\nGrading objective questions...")
 
-            grading_results = grade_objective_questions(
+            objective_results = grade_objective_questions(
                 ocr_dir=STEP2_OCR_DIR,
                 answer_key_path=ANSWER_KEY,
                 output_dir=STEP4_OBJECTIVE_DIR
@@ -600,7 +604,7 @@ def main():
                 page_images = {p['page_num']: p['image'] for p in pages}
                 print(f"  Loaded {len(page_images)} pages")
 
-                grade_subjective_with_vlm(
+                subjective_results = grade_subjective_with_vlm(
                     subjective_regions_path=SUBJECTIVE_REGIONS_JSON,
                     answer_key_path=ANSWER_KEY,
                     rubric_dir=RUBRIC_DIR,
@@ -616,6 +620,47 @@ def main():
                 print(f"\nError: VLM grading failed: {e}")
                 import traceback
                 traceback.print_exc()
+
+        # Merge grading results
+        print(f"\n{'='*80}")
+        print("Generating Final Grading Report")
+        print(f"{'='*80}")
+
+        final_results = {
+            'student_id': student_id,
+            'exam_name': exam_name,
+            'objective': {
+                'total_score': objective_results.get('total_score', 0) if objective_results else 0,
+                'total_possible_score': objective_results.get('total_possible_score', 0) if objective_results else 0,
+                'questions': objective_results.get('questions', {}) if objective_results else {}
+            },
+            'subjective': {
+                'total_score': subjective_results.get('total_subjective_score', 0) if subjective_results else 0,
+                'total_possible_score': subjective_results.get('max_subjective_score', 0) if subjective_results else 0,
+                'questions': subjective_results.get('grading_results', {}) if subjective_results else {}
+            },
+            'summary': {
+                'objective_score': objective_results.get('total_score', 0) if objective_results else 0,
+                'objective_max': objective_results.get('total_possible_score', 0) if objective_results else 0,
+                'subjective_score': subjective_results.get('total_subjective_score', 0) if subjective_results else 0,
+                'subjective_max': subjective_results.get('max_subjective_score', 0) if subjective_results else 0,
+                'total_score': (objective_results.get('total_score', 0) if objective_results else 0) +
+                              (subjective_results.get('total_subjective_score', 0) if subjective_results else 0),
+                'total_max': (objective_results.get('total_possible_score', 0) if objective_results else 0) +
+                            (subjective_results.get('max_subjective_score', 0) if subjective_results else 0)
+            }
+        }
+
+        # Save final results
+        final_results_path = OUTPUT_BASE / "grading_results.json"
+        with open(final_results_path, 'w', encoding='utf-8') as f:
+            json.dump(final_results, f, ensure_ascii=False, indent=2)
+
+        print(f"\n  Final Results:")
+        print(f"    Objective: {final_results['summary']['objective_score']}/{final_results['summary']['objective_max']}")
+        print(f"    Subjective: {final_results['summary']['subjective_score']}/{final_results['summary']['subjective_max']}")
+        print(f"    Total: {final_results['summary']['total_score']}/{final_results['summary']['total_max']}")
+        print(f"\n  Saved to: {final_results_path}")
 
         print(f"\n  Completed grading for {student_id}")
 

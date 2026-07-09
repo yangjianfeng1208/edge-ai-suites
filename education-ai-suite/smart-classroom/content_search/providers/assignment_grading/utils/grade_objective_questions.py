@@ -318,8 +318,7 @@ def grade_objective_questions(
             'is_correct': is_correct,
             'max_score': max_score,
             'earned_score': earned_score,
-            'page': page_num,
-            'ocr_content': ocr_content[:100] if ocr_content else None
+            'page': page_num
         }
 
     # Print table footer

@@ -1,7 +1,7 @@
 pipeline:
   # Exam configuration (can be overridden by command line arguments)
-  rubric_dir: "./test_data/2025_sh_zhongkao_math/rubric_guided_scoring"  # Answer key and grading rubrics (shared by all students)
-  papers_dir: "./test_data/2025_sh_zhongkao_math/papers"                 # Directory containing all student papers (student1/, student2/, ...)
+  rubric_dir: "./test_data/2025_sh_zhongkao_yuwen/rubric_guided_scoring"  # Answer key and grading rubrics (shared by all students)
+  papers_dir: "./test_data/2025_sh_zhongkao_yuwen/papers"                 # Directory containing all student papers (student1/, student2/, ...)
 
   # Processing steps control
   skip_subjective: false       # Skip subjective grading (VLM-based)
