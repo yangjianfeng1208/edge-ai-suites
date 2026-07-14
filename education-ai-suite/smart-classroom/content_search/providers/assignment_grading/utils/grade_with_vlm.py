@@ -74,7 +74,7 @@ def construct_vlm_prompt(question_id, rubric, answer_image_path):
             score = example.get('score', 0)
             prompt += f"\nStudent answer: {ans[:50]}... → Score: {score} points"
 
-    prompt += f"\n\nReview the student's handwritten answer in the image and grade it.\n\n**IMPORTANT - Required Output Format:**\n\nYou MUST provide:\n1. **Analysis**: Check each grading criterion listed above, explain which ones the student met and which ones were missed (at least 3-5 sentences)\n2. **Scoring Breakdown**: Show points earned for each criterion\n3. **Final Score**: End with 'Total Score: X points' (where X is 0-{max_score})\n\nDO NOT skip the analysis section. Your response must be detailed and thorough.\n"
+    prompt += f"\n\nReview the student's handwritten answer in the image and grade it.\n\n**Output format (be concise, no long explanations, no step-by-step derivations):**\nFor each criterion above, output exactly one short line:\n- <criterion>: <points earned>/<max> - <reason in <=15 words>\nThen end with exactly one line:\nTotal Score: X points (where X is 0-{max_score})\n\nDo not restate the question or rubric. Do not re-derive the solution.\n"
 
     image_base64 = encode_image_to_base64(answer_image_path)
 
@@ -96,7 +96,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
         "messages": [
             {
                 "role": "system",
-                "content": "You are a strict exam grader. You must:\n1. Carefully read the student's handwritten answer in the image\n2. Check each criterion in the grading rubric one by one\n3. Explain which criteria are met and which are not\n4. Do not guess steps the student omitted\n5. Provide detailed analysis before giving the final score\n6. End with 'Total Score: X points' where X is the final score"
+                "content": "You are a strict exam grader. Read the student's handwritten answer in the image, check each rubric criterion, and award points. Do not guess steps the student omitted. Be concise: one short line per criterion (points earned + brief reason), no long analysis, no re-derivation. Always end with exactly one line 'Total Score: X points' where X is the final score."
             },
             {
                 "role": "user",
@@ -140,7 +140,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
 
             vlm_output = data.get('choices', [{}])[0].get('message', {}).get('content', '')
 
-            if len(vlm_output) < 100 and attempt < max_retries - 1:
+            if len(vlm_output) < 10 and attempt < max_retries - 1:
                 print(f"\n     WARNING: Output too short ({len(vlm_output)} chars), retrying with stronger prompt...")
                 continue
 
@@ -152,7 +152,7 @@ def call_vlm_api(vlm_input, model='local', api_url='http://127.0.0.1:9900', max_
             print(f"    Output length: {len(vlm_output)} chars\n")
 
             final_score_patterns = [
-                (r'Total Score[：:=\s]*(\d+)\s*points?', 'Total Score'),
+                (r'Total Score[：:=\s\*]*(\d+)\s*points?', 'Total Score'),
                 (r'Final score should be\s*(\d+)\s*points?', 'Final score'),
                 (r'Score[：:]\s*(\d+)\s*/\s*(\d+)', 'Score X/Y format'),
                 (r'(?:Final|Overall) score[：:]\s*(\d+)\s*points?', 'Final score'),

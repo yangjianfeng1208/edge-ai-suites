@@ -243,7 +243,7 @@ async def chat_completions(request: ChatCompletionRequest):
         if not prompt_text:
             raise HTTPException(status_code=400, detail="No text prompt found")
 
-        prompt_text = prompt_text.strip() + " /no_think"
+        prompt_text = prompt_text.strip()
 
         logger.info(f"Request: prompt={len(prompt_text)} chars, images={len(images)}, max_tokens={request.max_tokens}")
 
@@ -255,6 +255,24 @@ async def chat_completions(request: ChatCompletionRequest):
         gen_config.max_new_tokens = request.max_tokens
         gen_config.do_sample = False
 
+        # Disable Qwen3 thinking mode at the chat-template level (more reliable
+        # than the "/no_think" soft switch): apply the template manually with
+        # enable_thinking=False so an empty <think></think> block is inserted and
+        # the model answers directly, then turn off the pipeline's internal
+        # templating. Prepend the image placeholder so the pipeline still
+        # positions the image correctly.
+        gen_prompt = prompt_text
+        try:
+            media_tags = "<ov_genai_image_0>" if images else ""
+            history = [{"role": "user", "content": media_tags + prompt_text}]
+            gen_prompt = vlm_pipeline.get_tokenizer().apply_chat_template(
+                history, True, "", None, {"enable_thinking": False}
+            )
+            gen_config.apply_chat_template = False
+        except Exception as tmpl_error:
+            logger.warning(f"Manual chat template failed, falling back to raw prompt: {tmpl_error}")
+            gen_prompt = prompt_text
+
         if images:
             image_array = np.array(images[0])
             logger.debug(f"Image array shape: {image_array.shape}")
@@ -262,13 +280,13 @@ async def chat_completions(request: ChatCompletionRequest):
             image_tensor = ov.Tensor(image_array[None])
 
             result = vlm_pipeline.generate(
-                prompt_text,
+                gen_prompt,
                 image=image_tensor,
                 generation_config=gen_config
             )
         else:
             result = vlm_pipeline.generate(
-                prompt_text,
+                gen_prompt,
                 generation_config=gen_config
             )
 

@@ -43,44 +43,60 @@ python main.py
 
 ## Pipeline
 
+`main.py` runs the following steps per student paper. Each step writes to its own
+`step{N}_*` output directory, and the run ends with a per-step timing summary.
+
 ```
 ┌─────────────────┐
 │  PDF Exam Paper │
 └────────┬────────┘
          │
          ▼
-┌─────────────────────┐
-│  YOLO Detection     │  ← Detect answer regions
-└────────┬────────────┘
+┌───────────────────────────────┐
+│ Step 1: Layout Detection      │  ← Render PDF, detect answer regions
+│ (PP-DocLayout, API call)      │    via detection service
+│ → step1_layout_detection/     │
+└────────┬──────────────────────┘
          │
          ▼
-┌─────────────────────┐
-│  Extract Regions    │  ← Crop answer boxes
-└────────┬────────────┘
+┌───────────────────────────────┐
+│ Step 2: OCR Recognition       │  ← Region-based OCR (PaddleOCR-VL API)
+│ (PaddleOCR-VL, API call)      │    per-page / per-bbox timing
+│ → step2_ocr_regions/          │
+└────────┬──────────────────────┘
          │
          ▼
-┌─────────────────────┐
-│  OCR Recognition    │  ← PaddleOCR-VL (GPU/CPU)
-│  (API call)         │
-└────────┬────────────┘
+┌───────────────────────────────┐
+│ Step 3: Question Mapping &    │  ← Map questions to OCR regions,
+│ Subjective Region Detection   │    locate subjective answer regions
+│ → step3_question_mapping/     │    (handles cross-page questions)
+└────────┬──────────────────────┘
          │
          ▼
-┌─────────────────────┐
-│  Grade Objective    │  ← Rule-based matching
-│  (choice + blank)   │
-└────────┬────────────┘
+┌───────────────────────────────┐
+│ Step 4: Grade Objective       │  ← Rule-based matching
+│                               │    (OCR text vs answer key)
+│ → step4_objective_grading/    │
+└────────┬──────────────────────┘
          │
          ▼
-┌─────────────────────┐
-│  Grade Subjective   │  ← VLM scoring
-│  (API call)         │
-└────────┬────────────┘
+┌───────────────────────────────┐
+│ Step 5: Grade Subjective      │  ← Crop/stitch regions, VLM scoring
+│ (Qwen VLM, API call)          │    per-question timing
+│ → step5_subjective_grading/   │    (optional: skip_subjective)
+└────────┬──────────────────────┘
          │
          ▼
-┌─────────────────────┐
-│  JSON Results       │
-└─────────────────────┘
+┌───────────────────────────────┐
+│ Final: Merge Results          │  ← objective + subjective totals
+│ → grading_results.json        │
+└───────────────────────────────┘
 ```
+
+**Services used:** Step 1 calls the detection service, Step 2 the OCR server
+(`ocr_services/paddleocr_vl_server.py`), Step 5 the VLM server
+(`Qwen_services/vlm_server.py`). Step 5 is skipped when `pipeline.skip_subjective`
+is `true`; OCR can reuse cached results via `pipeline.skip_ocr`.
 
 ## Configuration
 
@@ -112,11 +128,13 @@ vlm_service:
 ```
 outputs/
 └── {exam_name}/
-    ├── ocr_text/
-    │   └── {exam_name}_ocr.txt
-    ├── objective_grading.json
-    ├── processed_answers/
-    └── vlm_grading/
+    └── {student_id}/
+        ├── step1_layout_detection/     # per-page detection JSON + visualizations
+        ├── step2_ocr_regions/          # per-page OCR JSON + full_document.txt
+        ├── step3_question_mapping/     # question_mapping.json, subjective_regions.json
+        ├── step4_objective_grading/    # objective_grading.json, objective_questions.txt
+        ├── step5_subjective_grading/   # subjective_grading.json, cropped_answers/, vlm_details/
+        └── grading_results.json        # merged objective + subjective totals
 ```
 
 ---

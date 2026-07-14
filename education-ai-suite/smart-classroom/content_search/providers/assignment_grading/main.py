@@ -394,7 +394,9 @@ def main():
                 inference_time = result.get('total_inference_time', 0)
                 total_inference_time += inference_time
 
-                print(f"    Processed {len(ocr_results)} regions in {inference_time:.2f}s")
+                print(f"    Processed {len(ocr_results)} regions in {inference_time:.2f}s (page {page_num})")
+                for r in ocr_results:
+                    print(f"      - bbox {r.get('region_id', '?'):<18s} [{r.get('type', '?'):<8s}] {r.get('inference_time', 0):6.2f}s")
 
                 # Save page OCR results
                 page_ocr_path = STEP2_OCR_DIR / f"page_{page_num}_ocr.json"
@@ -675,6 +677,16 @@ def main():
     print(f"\n  Exam: {exam_name}")
     print(f"  Total students processed: {len(student_dirs)}")
     print(f"  Output directory: {BASE_DIR / f'outputs/{exam_name}'}")
+
+    # Per-step timing breakdown
+    if step_timings:
+        print(f"\n  Step Timings:")
+        name_width = max(len(name) for name in step_timings)
+        for name, secs in step_timings.items():
+            mins = int(secs // 60)
+            s = secs % 60
+            pct = (secs / total_elapsed * 100) if total_elapsed else 0
+            print(f"    {name:<{name_width}s}  {mins:2d}m {s:05.2f}s  ({pct:5.1f}%)")
 
     total_minutes = int(total_elapsed // 60)
     total_seconds = total_elapsed % 60

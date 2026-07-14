@@ -6,7 +6,7 @@ pipeline:
   # Processing steps control
   skip_subjective: false       # Skip subjective grading (VLM-based)
   skip_objective: false       # Skip objective grading (rule-based)
-  skip_ocr: true             # Skip OCR if results already exist
+  skip_ocr: false             # Skip OCR if results already exist
 
   # PDF rendering
   pdf_render_dpi: 300         # DPI for PDF rendering (higher = better quality, slower)

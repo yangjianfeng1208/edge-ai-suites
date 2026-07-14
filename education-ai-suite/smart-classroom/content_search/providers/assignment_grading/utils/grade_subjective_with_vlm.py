@@ -298,7 +298,9 @@ def grade_subjective_with_vlm(
         print(f"    {'-'*60}\n")
 
         # Call VLM API
+        q_start_time = time.time()
         vlm_result = call_vlm_api(vlm_input, model='qwen-vl', api_url=vlm_api_url)
+        q_elapsed = time.time() - q_start_time
 
         # Store result
         grading_result = {
@@ -313,7 +315,8 @@ def grade_subjective_with_vlm(
             'max_score': vlm_result.get('max_score', 0),
             'comment': vlm_result.get('comment', ''),
             'raw_output': vlm_result.get('raw_output', ''),
-            'model': vlm_result.get('model', 'qwen-vl')
+            'model': vlm_result.get('model', 'qwen-vl'),
+            'time_seconds': q_elapsed
         }
 
         grading_results.append(grading_result)
@@ -322,6 +325,7 @@ def grade_subjective_with_vlm(
         print(f"    Score: {vlm_result.get('total_score', 0)}/{vlm_result.get('max_score', 0)}")
         if vlm_result.get('comment'):
             print(f"    Comment: {vlm_result.get('comment', '')[:100]}")
+        print(f"    Time: {q_elapsed:.1f}s")
         print()
 
         # Save detailed output
@@ -334,7 +338,12 @@ def grade_subjective_with_vlm(
             f.write(f"Cross-page: {q_info['is_cross_page']}\n")
             f.write(f"Max score: {vlm_result.get('max_score', 0)} points\n")
             f.write(f"Score: {vlm_result.get('total_score', 0)} points\n")
+            f.write(f"Time: {q_elapsed:.1f}s\n")
             f.write(f"\n{'='*80}\n")
+            f.write(f"Grading Prompt:\n")
+            f.write(f"{'='*80}\n\n")
+            f.write(vlm_input.get('prompt', ''))
+            f.write(f"\n\n{'='*80}\n")
             f.write(f"VLM Full Output:\n")
             f.write(f"{'='*80}\n\n")
             f.write(vlm_result.get('raw_output', ''))
@@ -398,6 +407,10 @@ def grade_subjective_with_vlm(
     print(f"Questions Graded: {len(grading_results)}")
     print(f"  Total Time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} min)")
     print(f"  Average Time per Question: {avg_time:.1f}s")
+    print(f"  Per-Question Time:")
+    for r in grading_results:
+        print(f"    Q{r['question_id']:<4s} {r.get('time_seconds', 0):6.1f}s  "
+              f"(score {r['vlm_score']}/{r['max_score']})")
     print(f"Output JSON: {output_json}")
     print(f"Summary Report: {summary_file}")
     print(f"Cropped Images: {cropped_images_dir}")
