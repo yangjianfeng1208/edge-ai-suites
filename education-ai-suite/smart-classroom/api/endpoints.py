@@ -22,6 +22,7 @@ from components.ffmpeg import audio_preprocessing
 from utils.audio_util import save_audio_file
 from utils.locks import audio_pipeline_lock, video_analytics_lock
 from components.va.va_pipeline_service import VideoAnalyticsPipelineService, PipelineOptions
+from components.va.media_service import ensure_media_service_running
 from utils.session_manager import generate_session_id
 from dto.search_dto import SearchRequest
 from utils.session_state_manager import SessionState
@@ -41,7 +42,9 @@ def create_session():
 
 @router.get("/health")
 def health():
-    return JSONResponse(content={"status": "ok"}, status_code=200)
+    from model_manager import ModelManager
+    hub = ModelManager.instance().health()
+    return JSONResponse(content={"status": "ok", "hub": hub}, status_code=200)
 
 @router.post("/upload-audio")
 def upload_audio(file: UploadFile = File(...)):
@@ -267,6 +270,11 @@ def start_video_analytics_pipeline(
     # Check if a video analytics pipeline is already running for this session
     with video_analytics_lock:
         try:
+            # Ensure the MediaMTX RTSP server is up before any pipeline pushes to
+            # it. Started on demand. Failures are surfaced as a 500 by the outer
+            # handler below.
+            ensure_media_service_running()
+
             # Create or get service for this session
             if x_session_id not in va_services:
                 project_config = RuntimeConfig.get_section("Project")
@@ -303,6 +311,25 @@ def start_video_analytics_pipeline(
                             _tg.send_engagement_package_async(session_id, _session_dir, _front_posture)
                     except Exception as _e:
                         logger.error(f"[VA done] Failed to generate/send reports: {_e}", exc_info=True)
+
+                    # Board OCR: stop only if eos/stopped
+                    try:
+                        from components.board_ocr.board_ocr_pipeline import (
+                            stop_board_ocr,
+                        )
+                        content_status = _svc.pipeline_final_status.get("content")
+                        if content_status == "failed":
+                            logger.info(
+                                "[VA done] content pipeline failed after max retries; "
+                                "leaving board OCR running (reads source directly)."
+                            )
+                        else:
+                            stop_board_ocr(session_id)
+                    except Exception as _e:
+                        logger.error(
+                            f"[VA done] Failed to stop board OCR: {_e}",
+                            exc_info=True,
+                        )
                 va_services[x_session_id].on_all_pipelines_done = _on_all_pipelines_done
                 # ───────────────────────────────────────────────────────────────────────────
 
@@ -391,6 +418,22 @@ def start_video_analytics_pipeline(
                 ]
                 results = [f.result() for f in futures]
 
+            # Board OCR: bring up the twin pipeline for the content source.
+            # It reads the source directly, so start it even if the VA content
+            # pipeline itself failed to launch/stay up — as long as a content
+            # request with a source is valide.
+            try:
+                content_req = next(
+                    (r for r in requests if r.pipeline_name == "content"), None
+                )
+                if content_req:
+                    from components.board_ocr.board_ocr_pipeline import (
+                        start_board_ocr,
+                    )
+                    start_board_ocr(x_session_id, content_req.source)
+            except Exception as _e:
+                logger.error(f"Failed to start board OCR pipeline: {_e}", exc_info=True)
+
             return JSONResponse(content={"results": results}, status_code=200)
 
         except Exception as e:
@@ -471,6 +514,19 @@ def stop_video_analytics_pipeline(
                             "pipeline_name": request.pipeline_name,
                             "session_id": x_session_id
                         })
+
+                        # Board OCR: stop when content pipeline stops
+                        if request.pipeline_name == "content":
+                            try:
+                                from components.board_ocr.board_ocr_pipeline import (
+                                    stop_board_ocr,
+                                )
+                                stop_board_ocr(x_session_id)
+                            except Exception as _e:
+                                logger.error(
+                                    f"Failed to stop board OCR pipeline: {_e}",
+                                    exc_info=True,
+                                )
                 except Exception as e:
                     logger.error(f"Error stopping pipeline '{request.pipeline_name}': {e}")
                     results.append({
@@ -926,9 +982,12 @@ def ocr_detect_file_endpoint(file: UploadFile = File(...)):
 
 
 @router.post("/ocr/extract-text", response_model=OCRResponse)
-async def ocr_extract_text_endpoint(file: UploadFile = File(...), x_session_id: Optional[str] = Header(None)):
+def ocr_extract_text_endpoint(file: UploadFile = File(...), x_session_id: Optional[str] = Header(None)):
     return ocr_extract_text(file, x_session_id)
 
 
 def register_routes(app: FastAPI):
     app.include_router(router)
+
+    from components.board_ocr.summary_with_ocr import board_ocr_router
+    app.include_router(board_ocr_router)

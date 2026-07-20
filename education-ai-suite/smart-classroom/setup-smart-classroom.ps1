@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 param(
     [switch]$Help,
-    [switch]$NoElevate  
+    [switch]$NoElevate,
+    [switch]$Silent
 )
 
 # ============================================================================
@@ -25,6 +26,7 @@ if (-not $NoElevate) {
         
         $argList = "-NoExit -ExecutionPolicy Bypass -File `"$PSCommandPath`""
         if ($Help) { $argList += " -Help" }
+        if ($Silent) { $argList += " -Silent" }
         $argList += " -NoElevate"  # Prevent infinite elevation loop
         
         try {
@@ -43,11 +45,12 @@ if ($Help) {
     Write-Host @"
 Smart Classroom Setup Script
 
-Usage: ./setup-smart-classroom.ps1 [-Help] [-NoElevate]
+Usage: ./setup-smart-classroom.ps1 [-Help] [-NoElevate] [-Silent]
 
 Options:
     -Help       Show this help message
     -NoElevate  Skip auto-elevation to Administrator (Windows)
+    -Silent     Unattended mode - auto-install dependencies, no prompts
 
 System Requirements:
   - OS: Windows 11
@@ -71,7 +74,7 @@ This script will:
   1. Configure proxy for downloads (if needed)
   2. Check system requirements (OS, RAM, Python, Node.js, etc.)
   3. Check application dependencies (FFmpeg, DL Streamer)
-  4. Configure smart-classroom settings (language, upload limits, OCR)
+  4. Configure smart-classroom settings (language, upload limits, OCR, board OCR)
   5. Launch the startup script
 
 "@ -ForegroundColor Cyan
@@ -112,20 +115,51 @@ if (Test-Path $proxyConfigFile) {
     $script:httpProxy = $proxyConfig.httpProxy
     $script:httpsProxy = $proxyConfig.httpsProxy
     $script:noProxy = $proxyConfig.noProxy
-    
+
     Write-Host ""
     Write-Host "  Saved proxy settings found:" -ForegroundColor Cyan
     if ($script:httpProxy) { Write-Host "    HTTP_PROXY:  $($script:httpProxy)" -ForegroundColor Gray }
     if ($script:httpsProxy) { Write-Host "    HTTPS_PROXY: $($script:httpsProxy)" -ForegroundColor Gray }
     if ($script:noProxy) { Write-Host "    NO_PROXY:    $($script:noProxy)" -ForegroundColor Gray }
-    if (-not $script:httpProxy -and -not $script:httpsProxy) { Write-Host "    (No proxy configured)" -ForegroundColor Gray }
+    if (-not $script:httpProxy -and -not $script:httpsProxy) { 
+        Write-Host "    (No proxy configured in .proxy-config)" -ForegroundColor Gray 
+        
+        # Check environment for proxy settings
+        Write-Host ""
+        Write-Host "  Checking environment for existing proxy settings..." -ForegroundColor Gray
+        $envHttpProxy = if ($env:HTTP_PROXY) { $env:HTTP_PROXY } elseif ($env:http_proxy) { $env:http_proxy } else { "" }
+        $envHttpsProxy = if ($env:HTTPS_PROXY) { $env:HTTPS_PROXY } elseif ($env:https_proxy) { $env:https_proxy } else { "" }
+        $envNoProxy = if ($env:NO_PROXY) { $env:NO_PROXY } elseif ($env:no_proxy) { $env:no_proxy } else { "" }
+        
+        $envProxies = Get-ChildItem Env:\*proxy* -ErrorAction SilentlyContinue
+        if ($envProxies) {
+            $envProxies | ForEach-Object {
+                Write-Host "    Found: $($_.Name) = $($_.Value)" -ForegroundColor Cyan
+            }
+            Write-Host ""
+            Write-Host "  Environment variables detected. You can save these to .proxy-config." -ForegroundColor Yellow
+        } else {
+            Write-Host "    (No proxy environment variables found)" -ForegroundColor Gray
+        }
+    }
     Write-Host ""
-    
-    Write-Host "  [Y] Yes - Change proxy settings" -ForegroundColor White
-    Write-Host "  [N] No  - Use saved proxy settings" -ForegroundColor White
-    Write-Host "  [S] Skip - No proxy (direct connection)" -ForegroundColor White
-    Write-Host ""
-    $changeProxy = Read-Host "Do you want to change proxy settings? (Y/N/S)"
+
+    if ($Silent) {
+        Write-Host "  Silent mode: using saved proxy settings" -ForegroundColor Gray
+        $changeProxy = "N"
+    } else {
+        if (-not $script:httpProxy -and -not $script:httpsProxy -and ($envHttpProxy -or $envHttpsProxy)) {
+            Write-Host "  [Y] Yes - Configure different proxy settings" -ForegroundColor White
+            Write-Host "  [N] No  - Save environment proxy settings to .proxy-config" -ForegroundColor White
+            Write-Host "  [S] Skip - No proxy (direct connection)" -ForegroundColor White
+        } else {
+            Write-Host "  [Y] Yes - Change proxy settings" -ForegroundColor White
+            Write-Host "  [N] No  - Use saved proxy settings" -ForegroundColor White
+            Write-Host "  [S] Skip - No proxy (direct connection)" -ForegroundColor White
+        }
+        Write-Host ""
+        $changeProxy = Read-Host "Do you want to change proxy settings? (Y/N/S)"
+    }
     
     if ($changeProxy -match "^[Yy]") {
         Write-Host ""
@@ -153,17 +187,64 @@ if (Test-Path $proxyConfigFile) {
         $script:httpsProxy = ""
         Write-Host "  No proxy - using direct connection." -ForegroundColor Yellow
     } else {
-        Write-Host "  Using saved proxy settings." -ForegroundColor Gray
+        # If .proxy-config is empty but environment has proxy, save environment values
+        if (-not $script:httpProxy -and -not $script:httpsProxy -and ($envHttpProxy -or $envHttpsProxy)) {
+            $script:httpProxy = $envHttpProxy
+            $script:httpsProxy = $envHttpsProxy
+            $script:noProxy = $envNoProxy
+            
+            $proxyConfig = @{
+                httpProxy = $script:httpProxy
+                httpsProxy = $script:httpsProxy
+                noProxy = $script:noProxy
+            }
+            $proxyConfig | ConvertTo-Json | Set-Content $proxyConfigFile
+            Write-Host "  Environment proxy settings saved to .proxy-config:" -ForegroundColor Green
+            if ($script:httpProxy) { Write-Host "    HTTP_PROXY:  $($script:httpProxy)" -ForegroundColor Gray }
+            if ($script:httpsProxy) { Write-Host "    HTTPS_PROXY: $($script:httpsProxy)" -ForegroundColor Gray }
+            if ($script:noProxy) { Write-Host "    NO_PROXY:    $($script:noProxy)" -ForegroundColor Gray }
+        } else {
+            Write-Host "  Using saved proxy settings." -ForegroundColor Gray
+        }
     }
 } else {
     Write-Host ""
-    Write-Host "  No proxy configuration found." -ForegroundColor Gray
+    Write-Host "  No proxy configuration found in .proxy-config file." -ForegroundColor Gray
+    Write-Host "  Checking environment for existing proxy settings..." -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  [Y] Yes  - Configure proxy" -ForegroundColor White
-    Write-Host "  [N] No   - No proxy (direct connection)" -ForegroundColor White
-    Write-Host ""
-    $configureProxy = Read-Host "Do you want to configure a proxy? (Y/N)"
     
+    # Check environment variables for proxy settings
+    $envHttpProxy = if ($env:HTTP_PROXY) { $env:HTTP_PROXY } elseif ($env:http_proxy) { $env:http_proxy } else { "" }
+    $envHttpsProxy = if ($env:HTTPS_PROXY) { $env:HTTPS_PROXY } elseif ($env:https_proxy) { $env:https_proxy } else { "" }
+    $envNoProxy = if ($env:NO_PROXY) { $env:NO_PROXY } elseif ($env:no_proxy) { $env:no_proxy } else { "" }
+    
+    $envProxies = Get-ChildItem Env:\*proxy* -ErrorAction SilentlyContinue
+    if ($envProxies) {
+        $envProxies | ForEach-Object {
+            Write-Host "    Found: $($_.Name) = $($_.Value)" -ForegroundColor Cyan
+        }
+        Write-Host ""
+        Write-Host "  Environment variables detected. You can save these or configure different settings." -ForegroundColor Yellow
+    } else {
+        Write-Host "    (No proxy environment variables found)" -ForegroundColor Gray
+    }
+    Write-Host ""
+
+    if ($Silent) {
+        Write-Host "  Silent mode: using environment proxy settings if available" -ForegroundColor Gray
+        $configureProxy = "N"
+    } else {
+        if ($envHttpProxy -or $envHttpsProxy) {
+            Write-Host "  [Y] Yes  - Configure different proxy settings" -ForegroundColor White
+            Write-Host "  [N] No   - Save current environment proxy settings to .proxy-config" -ForegroundColor White
+        } else {
+            Write-Host "  [Y] Yes  - Configure proxy (save to .proxy-config)" -ForegroundColor White
+            Write-Host "  [N] No   - No proxy (direct connection)" -ForegroundColor White
+        }
+        Write-Host ""
+        $configureProxy = Read-Host "Do you want to configure a proxy? (Y/N)"
+    }
+
     if ($configureProxy -match "^[Yy]") {
         Write-Host ""
         Write-Host "Enter proxy settings:" -ForegroundColor Yellow
@@ -186,13 +267,31 @@ if (Test-Path $proxyConfigFile) {
         $proxyConfig | ConvertTo-Json | Set-Content $proxyConfigFile
         Write-Host "  Proxy settings saved to .proxy-config" -ForegroundColor Green
     } else {
-        $proxyConfig = @{
-            httpProxy = ""
-            httpsProxy = ""
-            noProxy = ""
+        # If environment variables exist, save them; otherwise save empty config
+        if ($envHttpProxy -or $envHttpsProxy) {
+            $script:httpProxy = $envHttpProxy
+            $script:httpsProxy = $envHttpsProxy
+            $script:noProxy = $envNoProxy
+            
+            $proxyConfig = @{
+                httpProxy = $script:httpProxy
+                httpsProxy = $script:httpsProxy
+                noProxy = $script:noProxy
+            }
+            $proxyConfig | ConvertTo-Json | Set-Content $proxyConfigFile
+            Write-Host "  Environment proxy settings saved to .proxy-config:" -ForegroundColor Green
+            if ($script:httpProxy) { Write-Host "    HTTP_PROXY:  $($script:httpProxy)" -ForegroundColor Gray }
+            if ($script:httpsProxy) { Write-Host "    HTTPS_PROXY: $($script:httpsProxy)" -ForegroundColor Gray }
+            if ($script:noProxy) { Write-Host "    NO_PROXY:    $($script:noProxy)" -ForegroundColor Gray }
+        } else {
+            $proxyConfig = @{
+                httpProxy = ""
+                httpsProxy = ""
+                noProxy = ""
+            }
+            $proxyConfig | ConvertTo-Json | Set-Content $proxyConfigFile
+            Write-Host "  No proxy configured. Settings saved." -ForegroundColor Gray
         }
-        $proxyConfig | ConvertTo-Json | Set-Content $proxyConfigFile
-        Write-Host "  No proxy configured. Settings saved." -ForegroundColor Gray
     }
 }
 
@@ -318,12 +417,16 @@ Show-SystemRequirementsFromDoc -DocPath $systemRequirementsDocPath -DocUrl $syst
 Write-Host "  Source:" -ForegroundColor Yellow
 Write-Host "  $systemRequirementsDocUrl" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Please review the system requirements above." -ForegroundColor Yellow
-$proceedChecks = Read-Host "Would you like to proceed with the setup? (Y/N)"
-if ($proceedChecks -notmatch "^[Yy]") {
-    Write-Host ""
-    Write-Host "Setup cancelled by user." -ForegroundColor Yellow
-    exit 0
+if ($Silent) {
+    Write-Host "Silent mode: proceeding with setup automatically..." -ForegroundColor Gray
+} else {
+    Write-Host "Please review the system requirements above." -ForegroundColor Yellow
+    $proceedChecks = Read-Host "Would you like to proceed with the setup? (Y/N)"
+    if ($proceedChecks -notmatch "^[Yy]") {
+        Write-Host ""
+        Write-Host "Setup cancelled by user." -ForegroundColor Yellow
+        exit 0
+    }
 }
 Write-Host ""
 
@@ -685,24 +788,34 @@ try {
             Write-Host "  [WARN] $npuName (Status: $npuStatus)" -ForegroundColor Yellow
             Write-Host "         NPU driver may need to be updated" -ForegroundColor DarkYellow
             Write-Host ""
-            $updateDriver = Read-Host "  Do you want to update the NPU driver? (Y/N)"
-            if ($updateDriver -match "^[Yy]") {
-                Install-NPUDriver | Out-Null
+            if ($Silent) {
+                Write-Host "  [SKIP] Silent mode: skipping NPU driver update" -ForegroundColor Yellow
+                $warnings += "NPU detected but status is $npuStatus (skipped in silent mode)"
             } else {
-                $warnings += "NPU detected but status is $npuStatus"
+                $updateDriver = Read-Host "  Do you want to update the NPU driver? (Y/N)"
+                if ($updateDriver -match "^[Yy]") {
+                    Install-NPUDriver | Out-Null
+                } else {
+                    $warnings += "NPU detected but status is $npuStatus"
+                }
             }
         }
     } else {
         Write-Host "  [WARN] Intel NPU not detected" -ForegroundColor Yellow
         Write-Host "         Intel NPU (Core Ultra Series) recommended for Video pipelines" -ForegroundColor DarkYellow
         Write-Host ""
-        $installNpu = Read-Host "  Do you want to install the Intel NPU driver? (Y/N)"
-        if ($installNpu -match "^[Yy]") {
-            if (-not (Install-NPUDriver)) {
-                $warnings += "Intel NPU driver installation pending (restart may be required)"
-            }
+        if ($Silent) {
+            Write-Host "  [SKIP] Silent mode: skipping NPU driver installation" -ForegroundColor Yellow
+            $warnings += "Intel NPU not detected (skipped in silent mode)"
         } else {
-            $warnings += "Intel NPU recommended for Video pipelines"
+            $installNpu = Read-Host "  Do you want to install the Intel NPU driver? (Y/N)"
+            if ($installNpu -match "^[Yy]") {
+                if (-not (Install-NPUDriver)) {
+                    $warnings += "Intel NPU driver installation pending (restart may be required)"
+                }
+            } else {
+                $warnings += "Intel NPU recommended for Video pipelines"
+            }
         }
     }
 } catch {
@@ -861,8 +974,13 @@ try {
 # Auto-install if not found or wrong version
 if ($pythonNeedsInstall) {
     Write-Host ""
-    $installChoice = Read-Host "  Install Python 3.12.10 now? (Y/N)"
-    
+    if ($Silent) {
+        Write-Host "  Silent mode: auto-installing Python 3.12.10..." -ForegroundColor Yellow
+        $installChoice = "Y"
+    } else {
+        $installChoice = Read-Host "  Install Python 3.12.10 now? (Y/N)"
+    }
+
     if ($installChoice -match "^[Yy]") {
         if (Install-Python312) {
             # Verify installation
@@ -1066,8 +1184,13 @@ try {
 # Auto-install if not found or needs upgrade
 if (-not $nodeInstalled) {
     Write-Host ""
-    $installChoice = Read-Host "  Install Node.js v22 LTS now? (Y/N)"
-    
+    if ($Silent) {
+        Write-Host "  Silent mode: auto-installing Node.js v22 LTS..." -ForegroundColor Yellow
+        $installChoice = "Y"
+    } else {
+        $installChoice = Read-Host "  Install Node.js v22 LTS now? (Y/N)"
+    }
+
     if ($installChoice -match "^[Yy]") {
         if (Install-NodeJS) {
             # Verify installation
@@ -1130,11 +1253,15 @@ if ($warnings.Count -gt 0) {
         Write-Host "  - $warn" -ForegroundColor DarkYellow
     }
     Write-Host ""
-    $continueSetup = Read-Host "Do you still want to continue with the setup? (Y/N)"
-    if ($continueSetup -notmatch "^[Yy]") {
-        Write-Host ""
-        Write-Host "Setup cancelled by user." -ForegroundColor Yellow
-        exit 0
+    if ($Silent) {
+        Write-Host "Silent mode: continuing with $($warnings.Count) warning(s)..." -ForegroundColor Yellow
+    } else {
+        $continueSetup = Read-Host "Do you still want to continue with the setup? (Y/N)"
+        if ($continueSetup -notmatch "^[Yy]") {
+            Write-Host ""
+            Write-Host "Setup cancelled by user." -ForegroundColor Yellow
+            exit 0
+        }
     }
 }
 
@@ -1236,8 +1363,13 @@ try {
 
 if (-not $ffmpegInstalled) {
     Write-Host ""
-    $installChoice = Read-Host "  Install FFmpeg now? (Y/N)"
-    
+    if ($Silent) {
+        Write-Host "  Silent mode: auto-installing FFmpeg..." -ForegroundColor Yellow
+        $installChoice = "Y"
+    } else {
+        $installChoice = Read-Host "  Install FFmpeg now? (Y/N)"
+    }
+
     if ($installChoice -match "^[Yy]") {
         if (Install-FFmpeg) {
             # Verify installation
@@ -1317,16 +1449,21 @@ if ($appChecksFailed) {
     Write-Host "WARNING: Some application dependencies are missing." -ForegroundColor Yellow
     Write-Host "         Certain features may not function correctly." -ForegroundColor DarkYellow
     Write-Host ""
-    $skipChoice = Read-Host "Do you still want to continue with the setup? (Y/N)"
-    
-    if ($skipChoice -match "^[Yy]") {
-        Write-Host ""
-        Write-Host "  Continuing setup with missing dependencies..." -ForegroundColor Yellow
+    if ($Silent) {
+        Write-Host "Silent mode: continuing with missing dependencies..." -ForegroundColor Yellow
         Write-Host ""
     } else {
-        Write-Host ""
-        Write-Host "  Setup cancelled. Please install the missing dependencies and try again." -ForegroundColor Gray
-        exit 1
+        $skipChoice = Read-Host "Do you still want to continue with the setup? (Y/N)"
+
+        if ($skipChoice -match "^[Yy]") {
+            Write-Host ""
+            Write-Host "  Continuing setup with missing dependencies..." -ForegroundColor Yellow
+            Write-Host ""
+        } else {
+            Write-Host ""
+            Write-Host "  Setup cancelled. Please install the missing dependencies and try again." -ForegroundColor Gray
+            exit 1
+        }
     }
 } else {
     Write-Host ""
@@ -1410,7 +1547,12 @@ Write-Host "Current language: $currentLanguage" -ForegroundColor Cyan
 Write-Host ""
 
 # Ask if user wants to change ASR settings
-$changeAsr = Read-Host "Do you want to change ASR settings? (Y/N)"
+if ($Silent) {
+    Write-Host "Silent mode: keeping existing ASR settings" -ForegroundColor Gray
+    $changeAsr = "N"
+} else {
+    $changeAsr = Read-Host "Do you want to change ASR settings? (Y/N)"
+}
 
 if ($changeAsr -match "^[Yy]") {
     Write-Host ""
@@ -1535,7 +1677,12 @@ Write-Host "      document_max_mb: $currentDocMax    # maximum upload size for d
 Write-Host "      video_max_mb: $currentVideoMax      # maximum upload size for videos (MB)" -ForegroundColor Gray
 Write-Host ""
 
-$changeUploadLimits = Read-Host "Do you want to change upload size limits? (Y/N)"
+if ($Silent) {
+    Write-Host "Silent mode: keeping existing upload size limits" -ForegroundColor Gray
+    $changeUploadLimits = "N"
+} else {
+    $changeUploadLimits = Read-Host "Do you want to change upload size limits? (Y/N)"
+}
 
 if ($changeUploadLimits.ToUpper() -eq "Y") {
     Write-Host ""
@@ -1577,7 +1724,12 @@ Write-Host "  ocr:" -ForegroundColor White
 Write-Host "    enabled: $currentOcr" -ForegroundColor Gray
 Write-Host ""
 
-$changeOcr = Read-Host "Do you want to change OCR setting? (Y/N)"
+if ($Silent) {
+    Write-Host "Silent mode: keeping existing OCR setting" -ForegroundColor Gray
+    $changeOcr = "N"
+} else {
+    $changeOcr = Read-Host "Do you want to change OCR setting? (Y/N)"
+}
 
 if ($changeOcr.ToUpper() -eq "Y") {
     Write-Host ""
@@ -1597,6 +1749,55 @@ if ($changeOcr.ToUpper() -eq "Y") {
     }
 } else {
     Write-Host "Keeping current OCR setting." -ForegroundColor Gray
+}
+
+Write-Host ""
+
+# ============================================================================
+# [3.4] Board OCR Configuration
+# ============================================================================
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host "[3.4] Board OCR Configuration (IFPD content summary)" -ForegroundColor Cyan
+Write-Host "----------------------------------------" -ForegroundColor DarkGray
+Write-Host ""
+
+# Extract current Board OCR enabled value
+$boardOcrMatch = [regex]::Match($configContent, "board_ocr:\s*\n\s*enabled:\s*(true|false)")
+$currentBoardOcr = if ($boardOcrMatch.Success) { $boardOcrMatch.Groups[1].Value } else { "false" }
+
+Write-Host "Current Board OCR configuration in config.yaml:" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  board_ocr:" -ForegroundColor White
+Write-Host "    enabled: $currentBoardOcr" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Note: Board OCR requires OCR to be enabled (ocr.enabled: true)." -ForegroundColor Gray
+Write-Host ""
+
+if ($Silent) {
+    Write-Host "Silent mode: keeping existing Board OCR setting" -ForegroundColor Gray
+    $changeBoardOcr = "N"
+} else {
+    $changeBoardOcr = Read-Host "Do you want to change Board OCR setting? (Y/N)"
+}
+
+if ($changeBoardOcr.ToUpper() -eq "Y") {
+    Write-Host ""
+    Write-Host "Board OCR Options:" -ForegroundColor Yellow
+    Write-Host "  true  - Enable Board OCR (extracts text from the teacher's display for summary)" -ForegroundColor Gray
+    Write-Host "  false - Disable Board OCR" -ForegroundColor Gray
+    Write-Host ""
+
+    $newBoardOcr = Read-Host "Enable Board OCR? (true/false, blank = $currentBoardOcr)"
+
+    if ($newBoardOcr.ToLower() -eq "true" -or $newBoardOcr.ToLower() -eq "false") {
+        $configContent = $configContent -replace "(board_ocr:\s*\n\s*enabled:\s*)(true|false)", "`${1}$($newBoardOcr.ToLower())"
+        Write-Host "  Board OCR enabled set to $($newBoardOcr.ToLower())" -ForegroundColor Gray
+        Write-Host "Board OCR configuration updated." -ForegroundColor Green
+    } else {
+        Write-Host "Keeping current Board OCR setting." -ForegroundColor Gray
+    }
+} else {
+    Write-Host "Keeping current Board OCR setting." -ForegroundColor Gray
 }
 
 Write-Host ""
@@ -1629,6 +1830,7 @@ $finalAsrDevice = if ($finalConfig -match "asr:[\s\S]*?device:\s*(\S+)") { $Matc
 $finalDocMax = if ($finalConfig -match "document_max_mb:\s*(\d+)") { $Matches[1] } else { "100" }
 $finalVideoMax = if ($finalConfig -match "video_max_mb:\s*(\d+)") { $Matches[1] } else { "1024" }
 $finalOcr = if ($finalConfig -match "ocr:\s*\n\s*enabled:\s*(true|false)") { $Matches[1] } else { "true" }
+$finalBoardOcr = if ($finalConfig -match "board_ocr:\s*\n\s*enabled:\s*(true|false)") { $Matches[1] } else { "false" }
 
 Write-Host "  Language:        $finalLang" -ForegroundColor White
 Write-Host "  ASR Provider:    $finalProvider" -ForegroundColor White
@@ -1637,30 +1839,89 @@ Write-Host "  ASR Device:      $finalAsrDevice" -ForegroundColor White
 Write-Host "  Doc Max (MB):    $finalDocMax" -ForegroundColor White
 Write-Host "  Video Max (MB):  $finalVideoMax" -ForegroundColor White
 Write-Host "  OCR Enabled:     $finalOcr" -ForegroundColor White
+Write-Host "  Board OCR:       $finalBoardOcr" -ForegroundColor White
 Write-Host ""
 
 # ============================================================================
-# LAUNCH STARTUP SCRIPT
+# PYTHON VIRTUAL ENVIRONMENTS
 # ============================================================================
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "   LAUNCHING SMART CLASSROOM" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "   CREATING VIRTUAL ENVIRONMENTS" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$startupScript = Join-Path $ScriptDir "start-smart-classroom.ps1"
+$venvBackend = Join-Path (Split-Path $ScriptDir -Parent) "smartclassroom"
+$venvContentSearch = Join-Path $ScriptDir "content_search\venv_content_search"
 
-if (Test-Path $startupScript) {
-    Write-Host "Starting: $startupScript" -ForegroundColor Yellow
-    Write-Host ""
-    
-    # Execute the startup script with -SkipProxy since proxy was already configured in setup
-    & $startupScript -SkipProxy
-} else {
-    Write-Host "ERROR: start-smart-classroom.ps1 not found at:" -ForegroundColor Red
-    Write-Host "  $startupScript" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please run it manually:" -ForegroundColor Yellow
-    Write-Host "  cd `"$ScriptDir`"" -ForegroundColor Gray
-    Write-Host "  .\start-smart-classroom.ps1" -ForegroundColor Gray
-    exit 1
+$recreateVenvs = $false
+if ((Test-Path $venvBackend) -or (Test-Path $venvContentSearch)) {
+    if ($Silent) {
+        Write-Host "Virtual environments exist, using existing (faster startup)" -ForegroundColor Gray
+        $recreateVenvs = $false
+    } else {
+        $response = Read-Host "Do you want to reinstall virtual environments? (Y/N, default: N)"
+        $recreateVenvs = $response.ToUpper() -eq "Y"
+        if ($recreateVenvs) {
+            Write-Host "Virtual environments will be recreated" -ForegroundColor Yellow
+        } else {
+            Write-Host "Using existing virtual environments (faster startup)" -ForegroundColor Gray
+        }
+    }
 }
+Write-Host ""
+
+Write-Host "Setting up Backend virtual environment..." -ForegroundColor Yellow
+if ($recreateVenvs -and (Test-Path $venvBackend)) {
+    Remove-Item $venvBackend -Recurse -Force
+}
+if (-not (Test-Path $venvBackend)) {
+    python -m venv $venvBackend
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to create Backend venv" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Installing Backend dependencies..." -ForegroundColor Yellow
+    & "$venvBackend\Scripts\python.exe" -m pip install --upgrade pip --no-input
+    & "$venvBackend\Scripts\python.exe" -m pip install -r (Join-Path $ScriptDir "requirements.txt") --no-input
+    Write-Host "[OK] Backend dependencies installed" -ForegroundColor Green
+} else {
+    Write-Host "[OK] Backend venv already exists" -ForegroundColor Green
+}
+Write-Host ""
+
+Write-Host "Setting up ContentSearch virtual environment..." -ForegroundColor Yellow
+if ($recreateVenvs -and (Test-Path $venvContentSearch)) {
+    Remove-Item $venvContentSearch -Recurse -Force
+}
+if (-not (Test-Path $venvContentSearch)) {
+    python -m venv $venvContentSearch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to create ContentSearch venv" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Installing ContentSearch dependencies..." -ForegroundColor Yellow
+    & "$venvContentSearch\Scripts\python.exe" -m pip install --upgrade pip --no-input
+    & "$venvContentSearch\Scripts\python.exe" -m pip install -r (Join-Path $ScriptDir "content_search\requirements.txt") --no-input
+    Write-Host "[OK] ContentSearch dependencies installed" -ForegroundColor Green
+} else {
+    Write-Host "[OK] ContentSearch venv already exists" -ForegroundColor Green
+}
+Write-Host ""
+
+# ============================================================================
+# SETUP COMPLETE
+# ============================================================================
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "   SETUP COMPLETE!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Smart Classroom setup has finished successfully." -ForegroundColor Green
+Write-Host ""
+Write-Host "To start the services, run:" -ForegroundColor Yellow
+Write-Host "  .\start-smart-classroom.ps1" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Or with options:" -ForegroundColor Gray
+Write-Host "  .\start-smart-classroom.ps1 -SkipProxy       # Skip proxy configuration" -ForegroundColor Gray
+Write-Host "  .\start-smart-classroom.ps1 -Restart         # Force restart all services" -ForegroundColor Gray
+Write-Host ""

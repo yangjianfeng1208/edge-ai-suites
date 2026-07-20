@@ -2,8 +2,8 @@ fastapi==0.116.1
 funasr==1.2.7
 
 # OpenVINO stack
-openvino==2026.1.0
-openvino-genai==2026.1.0.0
+openvino==2026.2.1
+openvino-genai==2026.2.1.0
 optimum==1.26.1
 optimum-intel==1.24.0
 nncf==2.19.0
@@ -20,7 +20,7 @@ WMI==1.5.1
 # Scientific stack (stability-critical)
 numpy==2.2.6
 pandas==2.2.3
-pyarrow==16.1.0
+pyarrow>=23.0.1
 scikit-learn==1.6.1
 scipy==1.15.3
 
@@ -36,11 +36,10 @@ datasets==3.6.0
 accelerate==1.10.1
 huggingface-hub==0.34.4
 safetensors==0.6.2
-sentence-transformers==3.0.1
 
 # Whisper / audio
 openai-whisper==20250625
-speechbrain==1.0.3
+speechbrain>=1.0.4
 pyannote.audio==4.0.4
 
 # Vector search
