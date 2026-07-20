@@ -392,15 +392,16 @@ def main():
     with open(config_path, 'r', encoding='utf-8') as f:
         cfg = yaml.safe_load(f)
 
-    default_model = cfg['model']['path']
-    default_device = cfg['model']['device']
-    default_host = cfg['server']['host']
-    default_port = cfg['server']['port']
+    svc = cfg['ocr_vl_service']
+    default_model = svc['path']
+    default_device = svc['device']
+    default_host = svc['host']
+    default_port = svc['port']
 
-    llm_int4 = cfg['model'].get('llm_int4_compress', False)
-    llm_int8 = cfg['model'].get('llm_int8_compress', True)
-    vision_int8 = cfg['model'].get('vision_int8_quant', False)
-    llm_int8_quant = cfg['model'].get('llm_int8_quant', True)
+    llm_int4 = svc.get('llm_int4_compress', False)
+    llm_int8 = svc.get('llm_int8_compress', True)
+    vision_int8 = svc.get('vision_int8_quant', False)
+    llm_int8_quant = svc.get('llm_int8_quant', True)
 
     parser = argparse.ArgumentParser(description="PaddleOCR-VL API Server")
     parser.add_argument(

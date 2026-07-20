@@ -4,7 +4,7 @@ pipeline:
   papers_dir: "./test_data/2025_sh_zhongkao_math/papers"                 # Directory containing all student papers (student1/, student2/, ...)
 
   # Processing steps control
-  skip_subjective: false       # Skip subjective grading (VLM-based)
+  skip_subjective: true       # Skip subjective grading (VLM-based)
   skip_objective: false       # Skip objective grading (rule-based)
   skip_ocr: false             # Skip OCR if results already exist
 

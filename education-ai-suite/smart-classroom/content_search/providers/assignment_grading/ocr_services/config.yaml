@@ -1,29 +1,45 @@
-server:
-  host: "0.0.0.0"
-  port: 9901
-
-model:
-  # path: "../models/ov_paddleocr-vl-1_6_model"
-  path: "../models/ov_paddleocr-vl-1_6_int4"
-  device: "GPU.1"
-  llm_int4_compress: true
-  llm_int8_compress: false
-  vision_int8_quant: false
-  llm_int8_quant: true
-
-layout_detection:
-  model_path: "../models/PP-DocLayoutV2-ov"
+layout_detection_vaildation:
+  model_path: "../models/PP-DocLayoutV3-ov"
   device: "NPU"
-  precision: "fp32"
+  precision: "fp16"
   threshold: 0.3
   # input_path: "../outputs/2025_sh_zhongkao_math/pdf_images"
   input_path: "./input"
   output_dir: "./output"
   visualize: true
 
+# PP-DocLayout download & convert
+layout_model_setup:
+  source: "modelscope"                              # 下载来源: modelscope 或 hf
+  repo_id: "PaddlePaddle/PP-DocLayoutV3"            # 模型下载地址(仓库 ID)
+  download_dir: "../models/PP-DocLayoutV3"          # 下载模型的存储目录
+  output_dir: "../models/PP-DocLayoutV3-ov"         # 转换后 OpenVINO IR 输出目录
+  precision: "fp16"                                 # 转换精度: fp32 / fp16 / int8
+  calibration_dir: "./input"                        # int8 量化的校准图目录
+  calibration_samples: 100                          # int8 量化使用的最大校准样本数
+  npu_compatible: true                              # 降级 ScatterNDUpdate opset15->4 兼容老 NPU; 新 NPU/仅 GPU 可设 false
+
+# PP-DocLayout detection service
 detection_service:
   host: "0.0.0.0"
   port: 9902
   base_url: "http://127.0.0.1:9902"
   timeout: 300
   max_retries: 2
+  model_path: "../models/PP-DocLayoutV2-ov"
+  device: "NPU"
+  precision: "fp16"
+
+# PaddleOCR-VL service
+ocr_vl_service:
+  host: "0.0.0.0"
+  port: 9901
+  base_url: "http://127.0.0.1:9901"
+  timeout: 300
+  max_retries: 2
+  path: "../models/ov_paddleocr-vl-1_6_int4"
+  device: "GPU.1"
+  llm_int4_compress: true
+  llm_int8_compress: false
+  vision_int8_quant: false
+  llm_int8_quant: true

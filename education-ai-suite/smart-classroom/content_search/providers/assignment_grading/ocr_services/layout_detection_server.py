@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from PIL import Image
 import uvicorn
-from layout_detection import LayoutDetectionService
+from layout_detection_v3 import LayoutDetectorV3
 
-detection_service: Optional[LayoutDetectionService] = None
+detection_service: Optional[LayoutDetectorV3] = None
 server_config = {
     'model_path': None,
     'device': None,
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     port = server_config['port']
 
     print(f"\n{'='*80}")
-    print(f"Starting PP-DocLayoutV2 Detection Server...")
+    print(f"Starting PP-DocLayout Detection Server...")
     print(f"  Model Path: {model_path}")
     print(f"  Device: {device}")
     print(f"  Precision: {precision}")
@@ -40,10 +40,9 @@ async def lifespan(app: FastAPI):
     print(f"{'='*80}\n")
 
     try:
-        detection_service = LayoutDetectionService(
+        detection_service = LayoutDetectorV3(
             model_path=model_path,
             device=device,
-            precision=precision,
             threshold=threshold
         )
         print(f"\n{'='*80}")
@@ -61,7 +60,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PP-DocLayoutV2 Detection API Server",
+    title="PP-DocLayout Detection API Server",
     description="Document layout detection service for detecting text, tables, images, formulas, etc.",
     version="1.0.0",
     lifespan=lifespan
@@ -184,11 +183,11 @@ async def get_stats():
     if detection_service is None:
         raise HTTPException(status_code=503, detail="Detection service not initialized")
 
-    stats = detection_service.get_perf_stats()
+    times = detection_service.inference_times
     return {
-        "model_load_time": stats.get('model_load_time', 0),
-        "total_inferences": len(stats.get('inference_times', [])),
-        "avg_inference_time": stats.get('avg_inference_time', 0) if 'avg_inference_time' in stats else 0
+        "model_load_time": detection_service.load_time,
+        "total_inferences": len(times),
+        "avg_inference_time": (sum(times) / len(times)) if times else 0
     }
 
 
@@ -203,19 +202,28 @@ def main():
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
+    svc_config = config.get('detection_service', {})
     layout_config = config.get('layout_detection', {})
 
-    # Get model path (relative to config file)
-    model_path = layout_config.get('model_path', '../models/PP-DocLayoutV2-ov')
-    if not Path(model_path).is_absolute():
+    # Model config comes from detection_service, falling back to layout_detection
+    model_path = svc_config.get('model_path') or layout_config.get('model_path', '../models/PP-DocLayoutV3-ov')
+    precision = svc_config.get('precision') or layout_config.get('precision')
+    device = svc_config.get('device') or layout_config.get('device', 'GPU')
+    threshold = svc_config.get('threshold', layout_config.get('threshold', 0.5))
+
+    # Resolve path (relative to config file) and append precision subdir
+    model_path = Path(model_path)
+    if not model_path.is_absolute():
         model_path = config_path.parent / model_path
+    if precision:
+        model_path = model_path / precision
 
     # Update server config
     server_config['model_path'] = str(model_path)
-    server_config['device'] = layout_config.get('device', 'GPU')
-    server_config['precision'] = layout_config.get('precision', 'fp32')
-    server_config['threshold'] = layout_config.get('threshold', 0.5)
-    server_config['port'] = config.get('detection_service', {}).get('port', 9902)
+    server_config['device'] = device
+    server_config['precision'] = precision
+    server_config['threshold'] = threshold
+    server_config['port'] = svc_config.get('port', 9902)
 
     # Start server
     uvicorn.run(

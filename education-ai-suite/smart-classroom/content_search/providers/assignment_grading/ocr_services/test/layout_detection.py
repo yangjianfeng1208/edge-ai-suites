@@ -131,14 +131,10 @@ class LayoutDetectionService:
                 return []
 
             # Extract class, score, coordinates
-            if det.shape[1] == 7:
-                cls = det[:, 1]
-                score = det[:, 2]
-                coords = det[:, 3:7]
-            else:
-                cls = det[:, 0]
-                score = det[:, 1]
-                coords = det[:, 2:6]
+            # Output row format: [cls_id, score, x1, y1, x2, y2, (optional extra)]
+            cls = det[:, 0]
+            score = det[:, 1]
+            coords = det[:, 2:6].copy()
 
             # Normalize coordinates if needed
             if np.max(coords) <= 2.0:
@@ -204,16 +200,19 @@ class LayoutDetectionService:
         input_blob, orig_h, orig_w = self._preprocess_image(image)
 
         # Prepare inputs
+        target_h, target_w = 800, 800
         input_tensors = self.compiled_model.inputs
         input_data = {}
         for inp in input_tensors:
             inp_name = inp.get_any_name()
             if inp_name == "im_shape":
-                input_data[inp_name] = np.array([[orig_h, orig_w]], dtype=np.float32)
+                input_data[inp_name] = np.array([[target_h, target_w]], dtype=np.float32)
             elif inp_name == "image":
                 input_data[inp_name] = input_blob
             elif inp_name == "scale_factor":
-                input_data[inp_name] = np.array([[1.0, 1.0]], dtype=np.float32)
+                input_data[inp_name] = np.array(
+                    [[target_h / orig_h, target_w / orig_w]], dtype=np.float32
+                )
 
         # Inference
         result = self.compiled_model(input_data)
@@ -321,7 +320,7 @@ def main():
     layout_config = config.get('layout_detection', {})
 
     # Get model path (relative to config file)
-    model_path = layout_config.get('model_path', '../models/PP-DocLayoutV2-ov')
+    model_path = layout_config.get('model_path', '../models/PP-DocLayoutV3-openvino')
     if not Path(model_path).is_absolute():
         model_path = config_path.parent / model_path
 

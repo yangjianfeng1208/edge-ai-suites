@@ -1,0 +1,50 @@
+{
+  "language": "en",
+  "version": "1.0",
+  "process_required": true,
+  "answer_only_score": 0,
+  "no_process_score": 0,
+  "empty_response_score": 0,
+  "partial_credit_enabled": true,
+  "scoring_principles": [
+    "A correct final answer with clear and complete reasoning receives full score.",
+    "A correct final answer without reasoning receives zero score.",
+    "If the final answer is incorrect but the method is mostly correct, award partial credit.",
+    "If key steps are missing or logically invalid, reduce score proportionally.",
+    "Blank or irrelevant responses receive zero score."
+  ],
+  "default_scoring_points": [
+    {
+      "id": "result",
+      "weight": 0.4,
+      "description": "Final result correctness"
+    },
+    {
+      "id": "process",
+      "weight": 0.5,
+      "description": "Reasoning quality and completeness"
+    },
+    {
+      "id": "expression",
+      "weight": 0.1,
+      "description": "Clarity and mathematical expression"
+    }
+  ],
+  "deduction_guidelines": [
+    {
+      "type": "missing_steps",
+      "description": "Important reasoning steps are omitted",
+      "suggested_deduction_ratio": 0.2
+    },
+    {
+      "type": "logic_error",
+      "description": "Core logical step is invalid",
+      "suggested_deduction_ratio": 0.3
+    },
+    {
+      "type": "minor_notation_issue",
+      "description": "Notation issue that does not affect correctness",
+      "suggested_deduction_ratio": 0.05
+    }
+  ]
+}
