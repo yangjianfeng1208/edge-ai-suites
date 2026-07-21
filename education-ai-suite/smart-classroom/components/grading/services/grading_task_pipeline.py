@@ -825,7 +825,7 @@ def run_grading_pipeline(
     subjective_results: dict[str, Any] | None = None
     if not skip_subjective and subjective_regions_output.exists():
         update_progress("subjective_grading", 85)
-        _log("step subjective_grading started")
+        _t = _step_start("subjective_grading")
         subjective_results = grade_subjective_with_vlm(
             subjective_regions_path=subjective_regions_output,
             answer_key_path=answer_key_path,
@@ -839,10 +839,11 @@ def run_grading_pipeline(
             use_rubric=subjective_use_rubric,
             debug_mode=debug_mode,
         )
-        _log(
-            "step subjective_grading completed "
+        _step_done(
+            "subjective_grading",
+            _t,
             f"score={subjective_results.get('total_subjective_score', 0)}"
-            f"/{subjective_results.get('max_subjective_score', 0)}"
+            f"/{subjective_results.get('max_subjective_score', 0)}",
         )
         if check_checkpoint("after_subjective_grading"):
             _log("checkpoint stop after_subjective_grading")
@@ -853,7 +854,7 @@ def run_grading_pipeline(
         _log("step subjective_grading skipped because subjective_regions.json missing")
 
     update_progress("merge_results", 95)
-    _log("step merge_results started")
+    _t = _step_start("merge_results")
 
     summary = {
         "objective_score": objective_results.get("total_score", 0) if objective_results else 0,
@@ -913,7 +914,7 @@ def run_grading_pipeline(
         json.dumps(result_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    _log(f"step merge_results completed final_result={task_paths['final']}")
+    _step_done("merge_results", _t, f"final_result={task_paths['final']}")
 
     return {
         "stopped": False,

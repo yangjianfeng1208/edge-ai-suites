@@ -40,6 +40,46 @@ def generate_rubrics_file(
     )
 
 
+def _rubrics_upload_dir() -> Path:
+    # components/grading/services/grading_service_impl.py -> components/grading/rubrics
+    upload_dir = Path(__file__).resolve().parents[1] / "rubrics"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
+
+
+def save_uploaded_rubric(filename: str, content: bytes) -> dict[str, Any]:
+    """Persist a user-uploaded rubric JSON file into the rubrics/ directory.
+
+    Returns the absolute path where it was stored so it can be passed as
+    rubric_path to a subsequent grading.run task.
+    """
+    if not content:
+        raise ValueError("uploaded file is empty")
+
+    # Guard against path traversal: keep only the base name.
+    name = Path(str(filename or "")).name.strip()
+    if not name:
+        raise ValueError("filename is required")
+    if not name.lower().endswith(".json"):
+        raise ValueError("rubric file must be a .json file")
+
+    # Validate it is well-formed JSON before storing.
+    try:
+        json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"uploaded file is not valid JSON: {exc}") from exc
+
+    dest = _rubrics_upload_dir() / name
+    dest.write_bytes(content)
+
+    return {
+        "status": "ok",
+        "filename": name,
+        "rubric_path": str(dest),
+        "size_bytes": len(content),
+    }
+
+
 _JOB_STORE = JsonJobStore(
     Path(__file__).resolve().parents[1] / "outputs" / "jobs" / "job_store.json"
 )

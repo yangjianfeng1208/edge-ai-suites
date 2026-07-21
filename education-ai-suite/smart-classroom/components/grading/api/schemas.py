@@ -22,6 +22,13 @@ class RubricGenerateResponse(BaseModel):
     template_applied: bool
 
 
+class RubricUploadResponse(BaseModel):
+    status: str
+    filename: str
+    rubric_path: str
+    size_bytes: int
+
+
 class GradingJobCreateRequest(BaseModel):
     input_path: str
     output_path: str

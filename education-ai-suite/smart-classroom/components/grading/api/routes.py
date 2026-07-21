@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from api.schemas import (
     GradingTaskControlResponse,
@@ -11,6 +11,7 @@ from api.schemas import (
     HealthResponse,
     RubricGenerateRequest,
     RubricGenerateResponse,
+    RubricUploadResponse,
 )
 from services.grading_service_impl import (
     create_task as create_task_dispatch,
@@ -20,6 +21,7 @@ from services.grading_service_impl import (
     request_task_cancel as request_task_cancel_impl,
     request_task_pause as request_task_pause_impl,
     request_task_resume as request_task_resume_impl,
+    save_uploaded_rubric,
     get_health,
 )
 
@@ -43,6 +45,17 @@ def create_router(language: str) -> APIRouter:
             return RubricGenerateResponse(**result)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"unexpected error: {exc}") from exc
+
+    @router.post("/rubrics/upload", response_model=RubricUploadResponse)
+    async def upload_rubric(file: UploadFile = File(...)) -> RubricUploadResponse:
+        try:
+            content = await file.read()
+            result = save_uploaded_rubric(filename=file.filename, content=content)
+            return RubricUploadResponse(**result)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
