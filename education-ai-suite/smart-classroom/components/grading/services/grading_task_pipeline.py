@@ -523,6 +523,25 @@ def _run_region_ocr(
             for i, box in enumerate(boxes)
         ]
 
+        # Debug: save the exact region crops the OCR service will see. Cropped
+        # from the preprocessed/resized page using the scaled bboxes, so these
+        # match what OCR actually receives (useful to inspect image clarity).
+        if debug_mode:
+            regions_debug_dir = step2_dir / "ocr_input_regions"
+            regions_debug_dir.mkdir(parents=True, exist_ok=True)
+            for region in regions:
+                bbox = region.get("bbox")
+                if not bbox or len(bbox) != 4:
+                    continue
+                x1, y1, x2, y2 = (int(round(c)) for c in bbox)
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                crop = pil_img.crop((x1, y1, x2, y2))
+                crop.save(
+                    regions_debug_dir / f"{region['region_id']}_{region['type']}.jpg",
+                    quality=95,
+                )
+
         temp_image_path = step2_dir / f"temp_page_{page_num}.jpg"
         jpeg_quality = int(preprocess.get("jpeg_quality", 95)) if preprocess else 95
         pil_img.save(temp_image_path, quality=jpeg_quality)
