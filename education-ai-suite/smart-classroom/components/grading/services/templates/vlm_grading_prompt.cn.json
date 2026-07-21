@@ -1,0 +1,22 @@
+{
+  "scenario": "你是一名{subject}老师，正在批改学生的试卷。这道题满分{max_score}分，请你依据下面的评分标准给出分数。",
+  "question_label": "题目",
+  "context_label": "题目背景",
+  "reference_answer_label": "参考答案",
+  "scoring_points_label": "评分维度（共{max_score}分，各维度相互独立、可累加评分）：",
+  "scoring_point_line_with_criteria": "- {desc}（{score}分）：{criteria}",
+  "scoring_point_line": "- {desc}：{score}分",
+  "scoring_rules_label": "评分标准（共{max_score}分，以下为互斥的判分情形，请判断学生答案最符合哪一种情形并据此给出总分，不要把各条相加）：",
+  "scoring_rule_line": "- {rule}",
+  "examples_label": "评分示例",
+  "example_line": "学生作答：{answer}... -> 得分：{score}分",
+  "review_instruction": "请查看图片中学生的手写作答并给出评分。",
+  "output_format_label": "**输出格式（简明扼要，不要展开推导过程，不要复述题目）：**",
+  "output_points_instruction": "针对以上每个评分维度，输出一行：\n- <维度>：<得分>/<满分> - <理由，不超过20字>",
+  "output_rules_instruction": "找出最符合学生答案的评分标准，输出一行：\n- 匹配标准：<引用该标准> - <理由，不超过20字>",
+  "output_total_instruction": "最后必须单独输出一行（保持英文关键词以便系统解析）：\nTotal Score: X points（X 为 0-{max_score} 的整数）",
+  "default_subject": "学科",
+  "no_rubric_scenario": "你是一名{subject}老师，正在批改学生的试卷。这道题没有评分标准，请假设这道题满分{max_score}分。请查看图片中学生的手写作答，判断其正确性与完整性，并按{max_score}分制给出分数。",
+  "no_rubric_review_instruction": "请查看图片中学生的手写作答，依据正确性、推理过程和完整性，按{max_score}分制给出评分。",
+  "no_rubric_output_instruction": "最多输出两行简短理由（每行不超过20字），最后必须单独输出一行（保持英文关键词以便系统解析）：\nTotal Score: X points（X 为 0-{max_score} 的整数）"
+}

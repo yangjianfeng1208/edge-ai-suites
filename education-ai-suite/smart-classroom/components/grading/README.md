@@ -41,6 +41,34 @@ python Qwen_services/vlm_server.py
 python main.py
 ```
 
+## Grading Service Framework
+
+The grading component now has a standalone service framework entrypoint:
+
+```bash
+python grading_service.py --config ..\..\config.yaml
+```
+
+Notes:
+- This is a framework-only service for now (no grading API endpoints yet).
+- It reads runtime settings from the root `config.yaml` under:
+
+```yaml
+grading:
+  enabled: false
+  host_addr: "127.0.0.1"
+  port: 9012
+  provider:
+    layout_detection: http://0.0.0.0:9902
+    ocr_provider: http://0.0.0.0:9901
+    vlm_provider: http://0.0.0.0:9900
+  language: en
+```
+
+- If `grading.enabled` is `false`, the service exits by default.
+- Use `--ignore-enabled` to force start during development.
+- Use `--dry-run` to validate config loading without starting the server.
+
 ## Pipeline
 
 `main.py` runs the following steps per student paper. Each step writes to its own

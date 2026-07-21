@@ -1,0 +1,22 @@
+{
+  "scenario": "You are a {subject} teacher grading a student's exam. This question is worth {max_score} points in total. Grade it strictly according to the rubric below.",
+  "question_label": "Question",
+  "context_label": "Context",
+  "reference_answer_label": "Reference Answer",
+  "scoring_points_label": "Scoring Dimensions (Total {max_score} points, additive - award each independently and sum):",
+  "scoring_point_line_with_criteria": "- {desc} ({score} points): {criteria}",
+  "scoring_point_line": "- {desc}: {score} points",
+  "scoring_rules_label": "Scoring Rules (Total {max_score} points, non-additive - these describe alternative outcomes; identify which single rule best matches the student's answer and assign the total score accordingly. Do NOT treat each rule as a separate point to add up):",
+  "scoring_rule_line": "- {rule}",
+  "examples_label": "Grading Examples",
+  "example_line": "Student answer: {answer}... -> Score: {score} points",
+  "review_instruction": "Review the student's handwritten answer in the image and grade it.",
+  "output_format_label": "**Output format (be concise, no long explanations, no step-by-step derivations, do not restate the question):**",
+  "output_points_instruction": "For each scoring dimension above, output exactly one short line:\n- <dimension>: <points earned>/<max> - <reason in <=15 words>",
+  "output_rules_instruction": "Identify the single scoring rule that best matches the answer and output one short line:\n- Matched rule: <quote the matched rule> - <reason in <=15 words>",
+  "output_total_instruction": "Then output exactly one final line:\nTotal Score: X points (where X is 0-{max_score})",
+  "default_subject": "subject",
+  "no_rubric_scenario": "You are a {subject} teacher grading a student's exam. There is no rubric for this question, so assume it is worth {max_score} points in total. Read the student's handwritten answer in the image and judge its correctness and completeness, then award a score out of {max_score}.",
+  "no_rubric_review_instruction": "Review the student's handwritten answer in the image and grade it out of {max_score} points based on correctness, reasoning, and completeness.",
+  "no_rubric_output_instruction": "Output at most two short lines of reasoning (<=15 words each), then output exactly one final line:\nTotal Score: X points (where X is an integer 0-{max_score})"
+}
