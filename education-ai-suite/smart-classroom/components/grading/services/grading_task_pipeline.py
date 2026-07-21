@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -423,6 +424,56 @@ def _run_layout_detection(
     return pages
 
 
+def _preprocess_page_for_ocr(
+    pil_img: "PILImage.Image",
+    preprocess: dict[str, Any] | None,
+) -> tuple["PILImage.Image", float]:
+    """Apply OCR-time preprocessing to a full page image.
+
+    Resizing (resize_ratio / max_image_width / max_image_height /
+    max_image_pixels) shrinks the page and returns the applied scale factor so
+    the caller can scale bboxes to match and map results back afterward.
+    Enhancement (contrast / sharpness) and jpeg_quality do not affect geometry.
+    Returns (processed_image, scale) where scale multiplies original coords.
+    """
+    from PIL import ImageEnhance
+
+    if not preprocess:
+        return pil_img, 1.0
+
+    scale = 1.0
+    ratio = preprocess.get("resize_ratio")
+    if ratio and ratio != 1.0:
+        scale *= float(ratio)
+
+    w, h = pil_img.width * scale, pil_img.height * scale
+    max_w = preprocess.get("max_image_width")
+    if max_w and w > max_w:
+        scale *= max_w / w
+        w, h = pil_img.width * scale, pil_img.height * scale
+    max_h = preprocess.get("max_image_height")
+    if max_h and h > max_h:
+        scale *= max_h / h
+        w, h = pil_img.width * scale, pil_img.height * scale
+    max_px = preprocess.get("max_image_pixels")
+    if max_px and (w * h) > max_px:
+        scale *= (max_px / (w * h)) ** 0.5
+
+    if scale != 1.0:
+        new_w = max(1, int(pil_img.width * scale))
+        new_h = max(1, int(pil_img.height * scale))
+        pil_img = pil_img.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
+
+    contrast = preprocess.get("enhance_contrast")
+    if contrast and contrast != 1.0:
+        pil_img = ImageEnhance.Contrast(pil_img).enhance(float(contrast))
+    sharpness = preprocess.get("enhance_sharpness")
+    if sharpness and sharpness != 1.0:
+        pil_img = ImageEnhance.Sharpness(pil_img).enhance(float(sharpness))
+
+    return pil_img, scale
+
+
 def _run_region_ocr(
     pages: list[dict[str, Any]],
     step1_dir: Path,
@@ -431,6 +482,7 @@ def _run_region_ocr(
     max_tokens: int,
     max_pixels: int,
     debug_mode: bool = False,
+    preprocess: dict[str, Any] | None = None,
 ) -> None:
     health = requests.get(f"{ocr_url}/health", timeout=5)
     if health.status_code != 200:
@@ -453,9 +505,18 @@ def _run_region_ocr(
         if not isinstance(boxes, list) or not boxes:
             continue
 
+        if hasattr(image, "shape"):
+            pil_img = PILImage.fromarray(image)
+        else:
+            pil_img = image
+
+        pil_img, scale = _preprocess_page_for_ocr(pil_img, preprocess)
+
+        # bboxes come from step1 (original-resolution page); scale them to the
+        # possibly-resized page that is actually sent to OCR.
         regions = [
             {
-                "bbox": box.get("coordinate"),
+                "bbox": [c * scale for c in box.get("coordinate", [])],
                 "type": box.get("label", "text"),
                 "region_id": f"page{page_num}_region{i+1}",
             }
@@ -463,11 +524,8 @@ def _run_region_ocr(
         ]
 
         temp_image_path = step2_dir / f"temp_page_{page_num}.jpg"
-        if hasattr(image, "shape"):
-            pil_img = PILImage.fromarray(image)
-        else:
-            pil_img = image
-        pil_img.save(temp_image_path, quality=95)
+        jpeg_quality = int(preprocess.get("jpeg_quality", 95)) if preprocess else 95
+        pil_img.save(temp_image_path, quality=jpeg_quality)
 
         with temp_image_path.open("rb") as f:
             files = {"file": (f"page_{page_num}.jpg", f, "image/jpeg")}
@@ -495,6 +553,14 @@ def _run_region_ocr(
         ocr_results = result.get("results", [])
         inference_time = float(result.get("total_inference_time", 0.0))
         total_inference_time += inference_time
+
+        # Map bboxes back to original-image coordinates so downstream steps
+        # (question mapping, region cropping) operate on the full-res page.
+        if scale != 1.0:
+            for r in ocr_results:
+                bbox = r.get("bbox")
+                if isinstance(bbox, list):
+                    r["bbox"] = [c / scale for c in bbox]
 
         page_ocr_path = step2_dir / f"page_{page_num}_ocr.json"
         page_ocr_path.write_text(
@@ -557,6 +623,17 @@ def run_grading_pipeline(
         if log_event is not None:
             log_event(message)
 
+    # Per-step timing. _step_start logs "step X started" and returns the start
+    # time; _step_done logs completion with elapsed seconds appended.
+    def _step_start(step: str) -> float:
+        _log(f"step {step} started")
+        return time.perf_counter()
+
+    def _step_done(step: str, started: float, extra: str = "") -> None:
+        elapsed = time.perf_counter() - started
+        suffix = f" {extra}" if extra else ""
+        _log(f"step {step} completed elapsed={elapsed:.2f}s{suffix}")
+
     paper_path = Path(str(request_payload["paper_path"])).resolve()
     rubric_dir = _resolve_rubric_dir(str(request_payload["rubric_path"]), task_id=task_id)
     _log(f"resolved inputs paper_path={paper_path} rubric_dir={rubric_dir}")
@@ -594,6 +671,22 @@ def run_grading_pipeline(
     ocr_max_tokens = int(options.get("ocr_max_tokens", ocr_cfg.get("max_tokens", 1280)))
     ocr_max_pixels = int(options.get("ocr_max_pixels", ocr_cfg.get("max_pixels", 10000000)))
 
+    # Image preprocessing applied to the page sent to OCR (bboxes are scaled
+    # to match; results are mapped back to original-image coordinates).
+    def _opt_num(key: str) -> float | None:
+        val = options.get(key, ocr_cfg.get(key))
+        return float(val) if val is not None else None
+
+    ocr_preprocess = {
+        "jpeg_quality": int(options.get("jpeg_quality", ocr_cfg.get("jpeg_quality", 85))),
+        "resize_ratio": _opt_num("resize_ratio"),
+        "max_image_width": _opt_num("max_image_width"),
+        "max_image_height": _opt_num("max_image_height"),
+        "max_image_pixels": _opt_num("max_image_pixels"),
+        "enhance_contrast": _opt_num("enhance_contrast"),
+        "enhance_sharpness": _opt_num("enhance_sharpness"),
+    }
+
     layout_url = str(options.get("layout_detection_url") or provider_cfg.get("layout_detection", "http://127.0.0.1:9902"))
     ocr_url = str(options.get("ocr_api_url") or provider_cfg.get("ocr_provider", "http://127.0.0.1:9901"))
     vlm_url = str(options.get("vlm_api_url") or provider_cfg.get("vlm_provider", "http://127.0.0.1:9900"))
@@ -618,16 +711,16 @@ def run_grading_pipeline(
     answer_key_path = rubric_dir / "answer_key.json"
 
     update_progress("validate_inputs", 10)
-    _log("step validate_inputs started")
+    _t = _step_start("validate_inputs")
 
     if not paper_path.exists():
         raise FileNotFoundError(f"paper file not found: {paper_path}")
     if not answer_key_path.exists():
         raise FileNotFoundError(f"answer key not found in rubric dir: {answer_key_path}")
-    _log("step validate_inputs completed")
+    _step_done("validate_inputs", _t)
 
     update_progress("layout_detection", 20)
-    _log("step layout_detection started")
+    _t = _step_start("layout_detection")
     pages = _run_layout_detection(
         pdf_path=paper_path,
         step1_dir=task_paths["step1"],
@@ -636,14 +729,14 @@ def run_grading_pipeline(
         pdf_render_dpi=pdf_render_dpi,
         debug_mode=debug_mode,
     )
-    _log(f"step layout_detection completed pages={len(pages)}")
+    _step_done("layout_detection", _t, f"pages={len(pages)}")
 
     if check_checkpoint("after_layout_detection"):
         _log("checkpoint stop after_layout_detection")
         return {"stopped": True}
 
     update_progress("ocr_inference", 40)
-    _log("step ocr_inference started")
+    _t = _step_start("ocr_inference")
     _run_region_ocr(
         pages=pages,
         step1_dir=task_paths["step1"],
@@ -652,15 +745,16 @@ def run_grading_pipeline(
         max_tokens=ocr_max_tokens,
         max_pixels=ocr_max_pixels,
         debug_mode=debug_mode,
+        preprocess=ocr_preprocess,
     )
-    _log("step ocr_inference completed")
+    _step_done("ocr_inference", _t)
 
     if check_checkpoint("after_ocr_inference"):
         _log("checkpoint stop after_ocr_inference")
         return {"stopped": True}
 
     update_progress("question_mapping", 55)
-    _log("step question_mapping started")
+    _t = _step_start("question_mapping")
     question_mapping_output = task_paths["step3"] / "question_mapping.json"
     mapping_result = map_questions_to_regions(
         ocr_dir=task_paths["step2"],
@@ -669,11 +763,12 @@ def run_grading_pipeline(
         strategy="position",
         config=detail_config,
     )
-    _log(
-        "step question_mapping completed "
+    _step_done(
+        "question_mapping",
+        _t,
         f"total={mapping_result.get('total_questions', 0)} "
         f"objective={mapping_result.get('objective_questions', 0)} "
-        f"subjective={mapping_result.get('subjective_questions', 0)}"
+        f"subjective={mapping_result.get('subjective_questions', 0)}",
     )
 
     page_images = {int(p["page_num"]): p["image"] for p in pages}
@@ -688,7 +783,7 @@ def run_grading_pipeline(
     subjective_regions_output = task_paths["step3"] / "subjective_regions.json"
     subjective_region_result: dict[str, Any] | None = None
     if int(mapping_result.get("subjective_questions", 0)) > 0:
-        _log("step subjective_regioning started")
+        _t = _step_start("subjective_regioning")
         subjective_region_result = locate_subjective_questions(
             ocr_dir=task_paths["step2"],
             answer_key_path=answer_key_path,
@@ -699,14 +794,14 @@ def run_grading_pipeline(
             visualize=debug_mode,
             config=detail_config,
         )
-        _log("step subjective_regioning completed")
+        _step_done("subjective_regioning", _t)
 
     if check_checkpoint("after_question_mapping"):
         _log("checkpoint stop after_question_mapping")
         return {"stopped": True}
 
     update_progress("objective_grading", 70)
-    _log("step objective_grading started")
+    _t = _step_start("objective_grading")
     objective_results = grade_objective_questions(
         ocr_dir=task_paths["step2"],
         answer_key_path=answer_key_path,
@@ -716,10 +811,11 @@ def run_grading_pipeline(
         question_mapping_path=question_mapping_output,
         page_images=page_images,
     )
-    _log(
-        "step objective_grading completed "
+    _step_done(
+        "objective_grading",
+        _t,
         f"score={objective_results.get('total_score', 0)}"
-        f"/{objective_results.get('total_possible_score', 0)}"
+        f"/{objective_results.get('total_possible_score', 0)}",
     )
 
     if check_checkpoint("after_objective_grading"):

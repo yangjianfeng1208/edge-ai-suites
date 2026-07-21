@@ -4,54 +4,90 @@ import re
 import unicodedata
 from pathlib import Path
 from typing import Dict, List, Optional
-from services.text_normalizer import normalize_text
+from services.text_normalizer import normalize_text, normalize_for_match
 
 
-def extract_answer(content: str, q_type: str) -> str:
-    """Extract answer from question content with NFKC normalization"""
+def _extract_underline(content: str) -> Optional[str]:
+    """Extract the content of the first \\underline{...} with balanced braces.
+
+    Handles nested braces (e.g. \\underline{\\frac{1}{8}}). Returns None if
+    there is no underline or the braces are unbalanced.
+    """
+    idx = content.find(r'\underline')
+    if idx < 0:
+        return None
+    brace = content.find('{', idx)
+    if brace < 0:
+        return None
+    depth = 0
+    for i in range(brace, len(content)):
+        if content[i] == '{':
+            depth += 1
+        elif content[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return content[brace + 1:i]
+    return None
+
+
+def _match_by_containment(content: str, standards: List[str]) -> Optional[str]:
+    """Return the first standard answer that appears in the question text.
+
+    Both sides are normalized for matching. No length/numeric guard: this is
+    the first-version behavior (highest recall, accepts false positives for
+    short numeric answers that also occur in the question stem).
+    """
+    norm_content = normalize_for_match(content)
+    for raw in standards:
+        norm_ans = normalize_for_match(raw)
+        if norm_ans and norm_ans in norm_content:
+            return raw
+    return None
+
+
+def extract_answer(content: str, q_type: str, standards: Optional[List[str]] = None) -> Optional[str]:
+    """Extract the student's answer from a question's OCR text.
+
+    choice: match a bracketed option letter (A-D), NFKC handles full-width.
+    blank:  prefer the \\underline{...} span (balanced braces); otherwise fall
+            back to checking whether a standard answer is contained in the text.
+    """
     content = normalize_text(content)
 
     if q_type == 'choice':
         match = re.search(r'\(\s*([A-D])\s*\)', content)
         if match:
             return match.group(1)
+        return None
 
-    elif q_type == 'blank':
-        match = re.search(r'\\underline\{(?:\\text\{)?(.+?)\}+', content)
-        if match:
-            answer = match.group(1)
-            answer = answer.replace('\\text{', '').replace('}', '')
-            return answer.strip()
-
-        match = re.search(r'[,]([^,.]+)[.,\(]', content)
-        if match:
-            answer = match.group(1).strip()
-            if len(answer) < 50 and '(' not in answer and ')' not in answer:
-                return answer
-
-        match = re.search(r'=\s*(.+?)(?:\.|$)', content)
-        if match:
-            answer = match.group(1).strip()
-            if len(answer) < 50:
-                return answer
+    if q_type == 'blank':
+        underline = _extract_underline(content)
+        if underline is not None:
+            return underline.strip()
+        if standards:
+            return _match_by_containment(content, standards)
+        return None
 
     return None
 
 
 def check_answer(extracted: str, standard: List[str], match_mode: str = 'any') -> bool:
-    """Check if extracted answer matches standard answer"""
+    """Check if extracted answer matches standard answer (normalized compare)."""
     if not extracted or not standard:
         return False
 
+    norm_extracted = normalize_for_match(extracted)
+    norm_standard = [normalize_for_match(s) for s in standard]
+
     if match_mode == 'any':
-        return extracted in standard
+        return norm_extracted in norm_standard
 
     elif match_mode == 'all':
-        return all(ans in extracted for ans in standard)
+        return all(ans in norm_extracted for ans in norm_standard)
 
     elif match_mode == 'set':
-        extracted_set = set(extracted.split(','))
-        standard_set = set(standard)
+        extracted_set = set(normalize_for_match(x) for x in extracted.split(','))
+        standard_set = set(norm_standard)
         return extracted_set == standard_set
 
     return False
@@ -162,9 +198,9 @@ def grade_objective_questions(
             continue
 
         sub_patterns = [
-            (r'^(\d+)[锛塡)]', 'simple'),
-            (r'^[锛圽(](\d+)[锛塡)]', 'parenthesis'),
-            (r'^(\d+)[\.\s]*[锛圽(](\d+)[锛塡)]', 'compound'),
+            (r'^(\d+)[）)]', 'simple'),
+            (r'^[（(](\d+)[）)]', 'parenthesis'),
+            (r'^(\d+)[\.\s]*[（(](\d+)[）)]', 'compound'),
         ]
 
         matched = False
@@ -278,7 +314,7 @@ def grade_objective_questions(
             if q_region['question_num'] == full_id:
                 ocr_content = q_region['content']
                 page_num = q_region['page']
-                extracted_answer = extract_answer(ocr_content, q_type)
+                extracted_answer = extract_answer(ocr_content, q_type, standard_answer)
                 break
 
         is_correct = False
