@@ -17,7 +17,7 @@ ocr:
 
   # Image processing optimization (speed vs quality balance)
   jpeg_quality: 85          # JPEG quality (60-95), lower=faster
-  resize_ratio: 0.6        # Resize ratio (e.g., 0.5 for 50% size), null=no resize
+  resize_ratio: 0.75        # Resize ratio (e.g., 0.5 for 50% size), null=no resize
   max_image_width: null     # Max image width in pixels, null=no limit
   max_image_height: null    # Max image height in pixels, null=no limit
   max_image_pixels: 4000000    # Max total pixels (overrides pdf max_pixels), null=use max_pixels

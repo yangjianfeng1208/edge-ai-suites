@@ -1,0 +1,46 @@
+# models_hub direct dependencies only (Qwen VLM + PaddleOCR-VL + layout detection).
+#
+# OCR here is PaddleOCR-VL run via transformers/openvino — it does NOT use the
+# `paddleocr`/`paddlepaddle`/`paddlex` packages. Those were the source of the
+# numpy<2.4 conflict and are intentionally removed, so numpy is free again.
+#
+# Only packages actually imported by the code are listed. Indirect deps
+# (six, idna, certifi, aiohttp, matplotlib, pandas, ...) are left to pip.
+
+# Inference stack
+# openvino and openvino-genai must share the same release number.
+openvino==2026.2.1
+openvino-genai==2026.2.1.0
+nncf>=2.18.0
+torch==2.8.0
+torchvision==0.23.0
+transformers==4.54.0
+einops>=0.8.1
+sentencepiece>=0.2.1
+protobuf>=6.32.0
+
+# Model download
+huggingface-hub>=0.32.4
+modelscope>=1.26.0
+datasets>=3.0.0
+
+# Web service
+fastapi>=0.116.0
+uvicorn>=0.35.0
+pydantic>=2.11.0
+requests>=2.31.0
+PyYAML>=6.0
+
+# Imaging / PDF
+# No paddlex here, so numpy is only bounded by the openvino/nncf stack (<2.5).
+numpy>=1.24,<2.5
+pillow>=10.0.0
+opencv-python>=4.11.0.86
+pdf2image>=1.17.0
+
+# Utilities
+tqdm>=4.66.0
+
+python-multipart
+
+

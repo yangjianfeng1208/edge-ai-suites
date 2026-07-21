@@ -1,0 +1,15 @@
+openvino>=2025.4.1
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0
+transformers==4.54.0
+pillow
+opencv-python>=4.11.0.86
+numpy>=1.21.6
+pdf2image
+nncf>=2.18.0
+sentencepiece>=0.2.1
+einops>=0.8.1
+protobuf>=6.32.0
+modelscope>=1.26.0
+huggingface-hub>=0.32.4
